@@ -1,0 +1,4630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Team Kabira — Shoot Log</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<!-- Excel export (with fallback CDN if the primary one is blocked/fails) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"
+  onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';s.onload=function(){window.__xlsxReady=true;};document.head.appendChild(s);"
+  onload="window.__xlsxReady=true;"></script>
+
+<!-- Firebase COMPAT SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+
+<style>
+  :root{
+    --bg:#14131A;
+    --panel:#1C1B23;
+    --panel-alt:#232230;
+    --ink:#F2F0EA;
+    --ink-dim:#948FA0;
+    --rule:#34323F;
+    --accent:#E63946;
+    --accent-soft:rgba(230,57,70,0.16);
+    --amber:#F2B705;
+    --green:#5FBF7A;
+  }
+
+  *{
+    box-sizing:border-box;
+  }
+
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Space Grotesk',sans-serif;
+    min-height:100vh;
+    padding:32px 18px 60px;
+  }
+
+  .wrap{
+    max-width:1200px;
+    margin:0 auto;
+  }
+
+  .wrap.wide{
+    max-width:1400px;
+  }
+
+  .lockup{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:28px;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+
+  .lockup h1{
+    font-size:20px;
+    font-weight:700;
+    letter-spacing:0.02em;
+    margin:0;
+  }
+
+  .lockup .who{
+    font-family:'Space Mono',monospace;
+    font-size:12px;
+    color:var(--ink-dim);
+  }
+
+  .who a{
+    color:var(--accent);
+    text-decoration:none;
+    cursor:pointer;
+    margin-left:10px;
+  }
+
+  .who a:hover{
+    text-decoration:underline;
+  }
+
+  .slate{
+    background:var(--panel);
+    border-radius:6px;
+    overflow:hidden;
+    border:1px solid var(--rule);
+  }
+
+  .slate-stripe{
+    height:20px;
+    background:repeating-linear-gradient(
+      -45deg,
+      #EDEBE3 0 18px,
+      #14131A 18px 36px
+    );
+  }
+
+  .slate-body{
+    padding:22px 22px 26px;
+  }
+
+  .field{
+    margin-bottom:16px;
+  }
+
+  .field label{
+    display:block;
+    font-family:'Space Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.06em;
+    color:var(--ink-dim);
+    margin-bottom:6px;
+  }
+
+  .field input,
+  .field select,
+  .field textarea{
+    width:100%;
+    background:var(--panel-alt);
+    border:1px solid var(--rule);
+    border-radius:4px;
+    color:var(--ink);
+    font-family:'Space Grotesk',sans-serif;
+    font-size:15px;
+    padding:10px 12px;
+  }
+
+  .field textarea{
+    resize:vertical;
+    min-height:60px;
+  }
+
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus{
+    outline:2px solid var(--accent);
+    outline-offset:1px;
+  }
+
+  .row2{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+  }
+
+  .row3{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:14px;
+  }
+
+  @media(max-width:600px){
+    .row2,
+    .row3{
+      grid-template-columns:1fr;
+    }
+  }
+
+  button.primary{
+    width:100%;
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    border-radius:4px;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:15px;
+    padding:13px;
+    cursor:pointer;
+    margin-top:6px;
+  }
+
+  button.primary:hover{
+    background:#d02e3b;
+  }
+
+  button.primary:disabled{
+    opacity:0.5;
+    cursor:default;
+  }
+
+  button.secondary{
+    background:var(--green);
+    color:#fff;
+    border:none;
+    border-radius:4px;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    padding:10px 16px;
+    cursor:pointer;
+    margin:6px 6px 6px 0;
+  }
+
+  button.secondary:hover{
+    opacity:0.8;
+  }
+
+  button.ghost{
+    background:transparent;
+    border:1px solid var(--rule);
+    color:var(--ink);
+    border-radius:4px;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:13px;
+    padding:9px 14px;
+    cursor:pointer;
+  }
+
+  button.ghost:hover{
+    border-color:var(--accent);
+    color:var(--accent);
+  }
+
+  .msg{
+    font-family:'Space Mono',monospace;
+    font-size:12px;
+    margin-top:10px;
+    min-height:14px;
+  }
+
+  .msg.ok{
+    color:var(--green);
+  }
+
+  .msg.err{
+    color:var(--accent);
+  }
+
+  .msg.info{
+    color:var(--amber);
+  }
+
+  .section-title{
+    font-family:'Space Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.08em;
+    color:var(--ink-dim);
+    margin:30px 0 12px;
+  }
+
+  .entry{
+    display:flex;
+    gap:14px;
+    padding:13px 0;
+    border-bottom:1px solid var(--rule);
+    align-items:flex-start;
+  }
+
+  .entry .tc{
+    font-family:'Space Mono',monospace;
+    font-size:12px;
+    color:var(--ink-dim);
+    width:78px;
+    flex-shrink:0;
+    padding-top:2px;
+  }
+
+  .entry .main{
+    flex:1;
+    min-width:0;
+  }
+
+  .entry .brand{
+    font-weight:600;
+    font-size:14.5px;
+  }
+
+  .entry .meta{
+    font-size:13px;
+    color:var(--ink-dim);
+    margin-top:2px;
+  }
+
+  .entry .member{
+    font-family:'Space Mono',monospace;
+    font-size:11px;
+    color:var(--ink-dim);
+  }
+
+  .badge{
+    display:inline-block;
+    font-family:'Space Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:0.04em;
+    padding:2px 8px;
+    border-radius:20px;
+    flex-shrink:0;
+    margin-left:8px;
+  }
+
+  .badge.shot{
+    background:rgba(148,143,160,0.18);
+    color:var(--ink-dim);
+  }
+
+  .badge.editing{
+    background:rgba(242,183,5,0.16);
+    color:var(--amber);
+  }
+
+  .badge.delivered{
+    background:rgba(95,191,122,0.16);
+    color:var(--green);
+  }
+
+  .empty{
+    color:var(--ink-dim);
+    font-size:13.5px;
+    padding:20px 0;
+    font-family:'Space Mono',monospace;
+  }
+
+  .table-wrapper{
+    overflow-x:auto;
+    margin-bottom:30px;
+  }
+
+  .data-table{
+    width:100%;
+    border-collapse:collapse;
+    background:var(--panel);
+    border:1px solid var(--rule);
+    border-radius:6px;
+    overflow:hidden;
+    font-size:13px;
+  }
+
+  .data-table thead{
+    background:var(--panel-alt);
+  }
+
+  .data-table th{
+    padding:12px;
+    text-align:left;
+    font-family:'Space Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.06em;
+    color:var(--ink-dim);
+    border-bottom:1px solid var(--rule);
+    white-space:nowrap;
+  }
+
+  .data-table td{
+    padding:12px;
+    border-bottom:1px solid var(--rule);
+    white-space:nowrap;
+  }
+
+  .data-table tr:hover{
+    background:var(--panel-alt);
+  }
+
+  .data-table .number{
+    text-align:right;
+    font-family:'Space Mono',monospace;
+  }
+
+  .search-section{
+    background:var(--panel);
+    border:1px solid var(--rule);
+    border-radius:6px;
+    padding:22px;
+    margin-bottom:30px;
+  }
+
+  .search-box{
+    display:flex;
+    gap:10px;
+    margin-bottom:20px;
+  }
+
+  .search-box input{
+    flex:1;
+    background:var(--panel-alt);
+    border:1px solid var(--rule);
+    border-radius:4px;
+    color:var(--ink);
+    font-family:'Space Grotesk',sans-serif;
+    font-size:15px;
+    padding:10px 12px;
+  }
+
+  .search-box input:focus{
+    outline:2px solid var(--accent);
+    outline-offset:1px;
+  }
+
+  .member-stats{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:14px;
+    margin-top:20px;
+  }
+
+  @media(max-width:600px){
+    .member-stats{
+      grid-template-columns:repeat(2,1fr);
+    }
+  }
+
+  .member-stat{
+    background:var(--panel-alt);
+    border:1px solid var(--rule);
+    border-radius:6px;
+    padding:14px;
+  }
+
+  .member-stat .label{
+    font-family:'Space Mono',monospace;
+    font-size:11px;
+    color:var(--ink-dim);
+    margin-bottom:8px;
+  }
+
+  .member-stat .value{
+    font-size:24px;
+    font-weight:700;
+    color:var(--accent);
+  }
+
+  .member-details{
+    margin-top:20px;
+  }
+
+  .member-details h3{
+    margin:0 0 16px;
+    font-size:16px;
+    color:var(--accent);
+  }
+
+  .gate{
+    max-width:380px;
+    margin:80px auto 0;
+  }
+
+  .gate .slate-body{
+    padding:26px 24px 28px;
+  }
+
+  .gate h2{
+    font-size:17px;
+    margin:0 0 4px;
+  }
+
+  .gate p{
+    font-size:13px;
+    color:var(--ink-dim);
+    margin:0 0 18px;
+  }
+
+  .namelist{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:14px;
+  }
+
+  .namechip{
+    font-family:'Space Mono',monospace;
+    font-size:12.5px;
+    padding:7px 12px;
+    border:1px solid var(--rule);
+    border-radius:20px;
+    cursor:pointer;
+    background:var(--panel-alt);
+  }
+
+  .namechip:hover{
+    border-color:var(--accent);
+  }
+
+  .namechip.active{
+    border-color:var(--accent);
+    background:var(--accent-soft);
+    color:var(--accent);
+  }
+
+  .divider{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin:16px 0;
+    color:var(--ink-dim);
+    font-family:'Space Mono',monospace;
+    font-size:10.5px;
+  }
+
+  .divider::before,
+  .divider::after{
+    content:"";
+    flex:1;
+    height:1px;
+    background:var(--rule);
+  }
+
+  .admin-link{
+    text-align:center;
+    margin-top:22px;
+  }
+
+  .admin-link a{
+    color:var(--ink-dim);
+    font-family:'Space Mono',monospace;
+    font-size:11.5px;
+    cursor:pointer;
+    text-decoration:none;
+  }
+
+  .admin-link a:hover{
+    color:var(--accent);
+  }
+
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:10px;
+    margin-bottom:26px;
+  }
+
+  @media(max-width:600px){
+    .stats{
+      grid-template-columns:repeat(2,1fr);
+    }
+  }
+
+  .stat{
+    background:var(--panel);
+    border:1px solid var(--rule);
+    border-radius:6px;
+    padding:14px;
+  }
+
+  .stat .n{
+    font-family:'Space Mono',monospace;
+    font-size:24px;
+    font-weight:700;
+  }
+
+  .stat .l{
+    font-size:11px;
+    color:var(--ink-dim);
+    margin-top:2px;
+  }
+
+  .filters{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:6px;
+  }
+
+  .filters select{
+    background:var(--panel-alt);
+    border:1px solid var(--rule);
+    color:var(--ink);
+    font-family:'Space Mono',monospace;
+    font-size:12px;
+    padding:8px 10px;
+    border-radius:4px;
+  }
+
+  .bar-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:8px;
+  }
+
+  .bar-row .name{
+    width:110px;
+    flex-shrink:0;
+    font-family:'Space Mono',monospace;
+    font-size:12px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  .bar-track{
+    flex:1;
+    background:var(--panel-alt);
+    border-radius:3px;
+    height:9px;
+    overflow:hidden;
+  }
+
+  .bar-fill{
+    height:100%;
+    background:var(--accent);
+  }
+
+  .bar-row .cnt{
+    width:22px;
+    text-align:right;
+    font-family:'Space Mono',monospace;
+    font-size:12px;
+    color:var(--ink-dim);
+  }
+
+  .reset-link{
+    text-align:center;
+    margin-top:40px;
+  }
+
+  .reset-link a{
+    color:var(--ink-dim);
+    font-family:'Space Mono',monospace;
+    font-size:10.5px;
+    cursor:pointer;
+    text-decoration:underline;
+  }
+
+  .button-group{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin:20px 0;
+  }
+
+  .loading-spinner{
+    display:inline-block;
+    width:20px;
+    height:20px;
+    border:3px solid var(--rule);
+    border-top-color:var(--accent);
+    border-radius:50%;
+    animation:spin 1s linear infinite;
+  }
+
+  @keyframes spin{
+    to{
+      transform:rotate(360deg);
+    }
+  }
+
+  .firebase-status{
+    margin-top:8px;
+    font-family:'Space Mono',monospace;
+    font-size:10px;
+    color:var(--ink-dim);
+  }
+
+  @media(max-width:480px){
+    body{
+      padding:20px 12px 40px;
+    }
+
+    .slate-body{
+      padding:18px;
+    }
+
+    .lockup h1{
+      font-size:17px;
+    }
+
+    .data-table{
+      font-size:12px;
+    }
+
+    .data-table th,
+    .data-table td{
+      padding:9px;
+    }
+  }
+</style>
+</head>
+
+<body>
+
+<div id="app"></div>
+
+<script>
+
+/* ============================================================
+   TEAM KABIRA CONFIGURATION
+   ============================================================ */
+
+const ADMIN_PASSCODE = "KABIRA2026";
+
+const CONTENT_TYPES = [
+  "Reel",
+  "Story",
+  "BTS",
+  "Full Shoot",
+  "Photoshoot",
+  "Other"
+];
+
+const STATUSES = [
+  "Shot",
+  "Editing",
+  "Delivered"
+];
+
+
+/* ============================================================
+   FIREBASE CONFIG
+   ============================================================ */
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAO2lw80Lio3-xmGPVH85Qn2xYm4HqCwGw",
+  authDomain: "team-kabira.firebaseapp.com",
+  databaseURL: "https://team-kabira-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "team-kabira",
+  storageBucket: "team-kabira.firebasestorage.app",
+  messagingSenderId: "318269601552",
+  appId: "1:318269601552:web:0b962754158cfc832a1795",
+  measurementId: "G-V6DL7GBXP0"
+};
+
+
+/* ============================================================
+   INITIALIZE FIREBASE
+   ============================================================ */
+
+let db = null;
+
+try {
+
+  firebase.initializeApp(firebaseConfig);
+
+  db = firebase.database();
+
+  console.log("Firebase initialized successfully.");
+
+} catch(error) {
+
+  console.error("Firebase initialization failed:", error);
+
+}
+
+
+/* ============================================================
+   APPLICATION STATE
+   ============================================================ */
+
+let state = {
+
+  view: "loading",
+
+  currentUser: null,
+
+  members: [],
+
+  entries: [],
+
+  newName: "",
+
+  form: {
+
+    brand: "",
+
+    contentType: CONTENT_TYPES[0],
+
+    date: "",
+
+    location: "",
+
+    status: STATUSES[0],
+
+    notes: "",
+
+    approvedBy: "",
+
+    coordinator: "",
+
+    reelTopic: "",
+
+    pay: "",
+
+    travel: ""
+
+  },
+
+  formMsg: null,
+
+  adminPass: "",
+
+  adminMsg: null,
+
+  searchMember: "",
+
+  isLoading: false,
+
+  errorMsg: "",
+
+  editingEntry: null,
+
+  editSaving: false,
+
+  editMsg: null,
+
+  syncMsg: null
+
+};
+
+
+/* ============================================================
+   DATE
+   ============================================================ */
+
+function todayISO(){
+
+  return new Date().toISOString().slice(0,10);
+
+}
+
+state.form.date = todayISO();
+
+
+/* ============================================================
+   LOCAL CACHE (so a page refresh never wipes data, even if
+   Firebase is briefly unreachable or a write is rejected by
+   the database rules)
+   ============================================================ */
+
+const LS_ENTRIES_KEY = "tk_cache_entries";
+const LS_MEMBERS_KEY = "tk_cache_members";
+
+function cacheEntries(){
+
+  try{
+
+    localStorage.setItem(
+      LS_ENTRIES_KEY,
+      JSON.stringify(state.entries)
+    );
+
+  }catch(error){
+
+    console.error("Could not cache entries locally:", error);
+
+  }
+
+}
+
+function cacheMembers(){
+
+  try{
+
+    localStorage.setItem(
+      LS_MEMBERS_KEY,
+      JSON.stringify(state.members)
+    );
+
+  }catch(error){
+
+    console.error("Could not cache members locally:", error);
+
+  }
+
+}
+
+function loadCachedEntries(){
+
+  try{
+
+    const raw = localStorage.getItem(LS_ENTRIES_KEY);
+
+    return raw ? JSON.parse(raw) : [];
+
+  }catch(error){
+
+    return [];
+
+  }
+
+}
+
+function loadCachedMembers(){
+
+  try{
+
+    const raw = localStorage.getItem(LS_MEMBERS_KEY);
+
+    return raw ? JSON.parse(raw) : [];
+
+  }catch(error){
+
+    return [];
+
+  }
+
+}
+
+
+/* ============================================================
+   LOAD ALL DATA
+   ============================================================ */
+
+async function loadAll(){
+
+  /* Seed from the local cache first. This is what actually
+     protects the data on refresh: if the Firebase read below
+     fails (offline, denied by database rules, etc.) we simply
+     keep what was already on this device instead of wiping it. */
+
+  state.members = loadCachedMembers();
+
+  state.entries = loadCachedEntries();
+
+
+  if(!db){
+
+    state.view = "error";
+
+    state.errorMsg =
+      "Firebase failed to initialize. Check the Firebase configuration.";
+
+    render();
+
+    return;
+
+  }
+
+
+  let membersSynced = false;
+
+  let entriesSynced = false;
+
+
+  try{
+
+    const membersSnap =
+      await db.ref("members").once("value");
+
+    const membersData = membersSnap.val();
+
+    if(membersData){
+
+      state.members =
+        Object.values(membersData);
+
+      cacheMembers();
+
+      membersSynced = true;
+
+    }
+    /* If Firebase legitimately has nothing yet, keep the
+       cached members instead of clearing them. */
+
+  }catch(error){
+
+    console.error("Load members failed (keeping local cache):", error);
+
+  }
+
+
+  try{
+
+    const entriesSnap =
+      await db.ref("entries").once("value");
+
+    const entriesData = entriesSnap.val();
+
+    if(entriesData){
+
+      state.entries =
+        Object.values(entriesData);
+
+      cacheEntries();
+
+      entriesSynced = true;
+
+    }
+    /* If Firebase legitimately has nothing yet, keep the
+       cached entries instead of clearing them. */
+
+  }catch(error){
+
+    console.error("Load entries failed (keeping local cache):", error);
+
+  }
+
+
+  state.entries.sort(
+    (a,b) =>
+      new Date(b.date || 0) -
+      new Date(a.date || 0)
+  );
+
+
+  /* If we had cached data that Firebase didn't return, push it
+     back up so it gets properly persisted server-side too. */
+
+  if(state.members.length && !membersSynced){
+
+    saveMembers().catch(error=>{
+      console.error("Re-sync of cached members failed:", error);
+    });
+
+  }
+
+  if(state.entries.length && !entriesSynced){
+
+    saveEntries().catch(error=>{
+      console.error("Re-sync of cached entries failed:", error);
+    });
+
+  }
+
+
+  const savedUser =
+    localStorage.getItem("currentUser");
+
+
+  if(savedUser){
+
+    state.currentUser = savedUser;
+
+    state.view = "member";
+
+  }else{
+
+    state.view = "gate";
+
+  }
+
+
+  render();
+
+}
+
+
+/* ============================================================
+   SAVE MEMBERS
+   ============================================================ */
+
+async function saveMembers(){
+
+  /* Always cache locally first — this is what survives a
+     refresh even if the Firebase write below fails. */
+
+  cacheMembers();
+
+
+  if(!db){
+
+    throw new Error("Firebase database is unavailable.");
+
+  }
+
+  try{
+
+    const membersObj = {};
+
+    state.members.forEach((member,index)=>{
+
+      membersObj[index] = member;
+
+    });
+
+    await db.ref("members").set(membersObj);
+
+    return true;
+
+  }catch(error){
+
+    console.error("Save members failed (kept in local cache):",error);
+
+    throw error;
+
+  }
+
+}
+
+
+/* ============================================================
+   SAVE ENTRIES
+   ============================================================ */
+
+async function saveEntries(){
+
+  /* Always cache locally first — this is what survives a
+     refresh even if the Firebase write below fails. */
+
+  cacheEntries();
+
+
+  if(!db){
+
+    throw new Error("Firebase database is unavailable.");
+
+  }
+
+  try{
+
+    const entriesObj = {};
+
+    state.entries.forEach((entry,index)=>{
+
+      entriesObj[entry.id || index] = entry;
+
+    });
+
+    await db.ref("entries").set(entriesObj);
+
+    return true;
+
+  }catch(error){
+
+    console.error("Save entries failed (kept in local cache):",error);
+
+    throw error;
+
+  }
+
+}
+
+
+/* ============================================================
+   MANUAL SYNC (push whatever is cached on this device up to
+   Firebase — useful after fixing Firebase Rules, or after a
+   period offline)
+   ============================================================ */
+
+async function syncAllToFirebase(){
+
+  state.syncMsg = {
+    type:"info",
+    text:"Syncing..."
+  };
+
+  render();
+
+
+  let membersOk = true;
+  let entriesOk = true;
+
+
+  try{
+    await saveMembers();
+  }catch(error){
+    membersOk = false;
+  }
+
+  try{
+    await saveEntries();
+  }catch(error){
+    entriesOk = false;
+  }
+
+
+  if(membersOk && entriesOk){
+
+    state.syncMsg = {
+      type:"ok",
+      text:"✓ Synced to Firebase."
+    };
+
+  }else{
+
+    state.syncMsg = {
+      type:"err",
+      text:"❌ Sync failed — check your Firebase Database Rules (they likely need to allow read/write)."
+    };
+
+  }
+
+
+  render();
+
+
+  setTimeout(()=>{
+
+    state.syncMsg = null;
+
+    render();
+
+  }, 3500);
+
+}
+
+
+/* ============================================================
+   SET CURRENT USER
+   ============================================================ */
+
+function setCurrentUser(name){
+
+  state.currentUser = name;
+
+  localStorage.setItem(
+    "currentUser",
+    name
+  );
+
+}
+
+
+/* ============================================================
+   RESET FORM
+   ============================================================ */
+
+function resetForm(){
+
+  state.form = {
+
+    brand: "",
+
+    contentType: CONTENT_TYPES[0],
+
+    date: todayISO(),
+
+    location: "",
+
+    status: STATUSES[0],
+
+    notes: "",
+
+    approvedBy: "",
+
+    coordinator: "",
+
+    reelTopic: "",
+
+    pay: "",
+
+    travel: ""
+
+  };
+
+}
+
+
+/* ============================================================
+   SUBMIT SHOOT
+   ============================================================ */
+
+async function submitEntry(){
+
+  if(!state.form.brand.trim()){
+
+    state.formMsg = {
+      type:"err",
+      text:"Brand is required."
+    };
+
+    render();
+
+    return;
+
+  }
+
+
+  if(!state.currentUser){
+
+    state.formMsg = {
+      type:"err",
+      text:"Please select your name first."
+    };
+
+    render();
+
+    return;
+
+  }
+
+
+  state.isLoading = true;
+
+  state.formMsg = null;
+
+  render();
+
+
+  const entry = {
+
+    id: Date.now().toString(),
+
+    member: state.currentUser,
+
+    date: state.form.date,
+
+    brand: state.form.brand.trim(),
+
+    contentType: state.form.contentType,
+
+    location: state.form.location.trim(),
+
+    status: state.form.status,
+
+    notes: state.form.notes.trim(),
+
+    approvedBy: state.form.approvedBy.trim(),
+
+    coordinator: state.form.coordinator.trim(),
+
+    reelTopic: state.form.reelTopic.trim(),
+
+    pay: state.form.pay
+      ? parseFloat(state.form.pay)
+      : 0,
+
+    travel: state.form.travel
+      ? parseFloat(state.form.travel)
+      : 0
+
+  };
+
+
+  state.entries.unshift(entry);
+
+  /* Cache immediately so the entry survives a refresh even if
+     the Firebase write below fails or is slow. */
+
+  cacheEntries();
+
+
+  try{
+
+    await saveEntries();
+
+    resetForm();
+
+    state.formMsg = {
+      type:"ok",
+      text:"✓ Shoot logged successfully!"
+    };
+
+  }catch(error){
+
+    /* Keep the entry locally — do NOT remove it. It's saved on
+       this device and will sync to Firebase automatically next
+       time the app loads or "Sync now" is pressed in Admin. */
+
+    state.formMsg = {
+      type:"info",
+      text:"⚠ Saved on this device, but couldn't sync to Firebase yet (check Firebase Rules). It will retry automatically."
+    };
+
+    console.error(error);
+
+  }
+
+
+  state.isLoading = false;
+
+  render();
+
+
+  if(state.formMsg?.type === "ok"){
+
+    setTimeout(()=>{
+
+      state.formMsg = null;
+
+      render();
+
+    },2000);
+
+  }
+
+}
+
+
+/* ============================================================
+   FORMAT DATE
+   ============================================================ */
+
+function fmtDate(iso){
+
+  if(!iso) return "-";
+
+  const d =
+    new Date(iso + "T00:00:00");
+
+  if(isNaN(d.getTime())) return iso;
+
+  return d.toLocaleDateString(
+    "en-US",
+    {
+      month:"short",
+      day:"numeric",
+      year:"numeric"
+    }
+  );
+
+}
+
+
+/* ============================================================
+   STATUS CLASS
+   ============================================================ */
+
+function statusBadgeClass(status){
+
+  if(status === "Shot")
+    return "shot";
+
+  if(status === "Editing")
+    return "editing";
+
+  if(status === "Delivered")
+    return "delivered";
+
+  return "shot";
+
+}
+
+
+/* ============================================================
+   ELEMENT HELPER
+   ============================================================ */
+
+function el(tag,attrs={}){
+
+  const elem =
+    document.createElement(tag);
+
+
+  if(attrs.text !== undefined)
+    elem.textContent = attrs.text;
+
+
+  if(attrs.html !== undefined)
+    elem.innerHTML = attrs.html;
+
+
+  if(attrs.onclick)
+    elem.onclick = attrs.onclick;
+
+
+  if(attrs.style)
+    elem.style.cssText = attrs.style;
+
+
+  delete attrs.text;
+  delete attrs.html;
+  delete attrs.onclick;
+  delete attrs.style;
+
+
+  Object.assign(elem,attrs);
+
+
+  return elem;
+
+}
+
+
+/* ============================================================
+   GATE / LOGIN SCREEN
+   ============================================================ */
+
+function renderGate(){
+
+  const wrap =
+    el("div",{class:"wrap"});
+
+
+  const lockup =
+    el("div",{class:"lockup"});
+
+
+  lockup.appendChild(
+    el("h1",{text:"TEAM KABIRA"})
+  );
+
+
+  wrap.appendChild(lockup);
+
+
+  const gateWrap =
+    el("div",{class:"gate"});
+
+
+  /* MEMBER LOGIN */
+
+  const slate =
+    el("div",{class:"slate"});
+
+
+  slate.appendChild(
+    el("div",{class:"slate-stripe"})
+  );
+
+
+  const body =
+    el("div",{class:"slate-body"});
+
+
+  body.appendChild(
+    el("h2",{text:"Who are you?"})
+  );
+
+
+  body.appendChild(
+    el("p",{
+      text:"Select your name to continue."
+    })
+  );
+
+
+  const list =
+    el("div",{class:"namelist"});
+
+
+  state.members.forEach(name=>{
+
+    list.appendChild(
+
+      el("div",{
+
+        class:"namechip",
+
+        text:name,
+
+        onclick:()=>{
+
+          setCurrentUser(name);
+
+          state.view = "member";
+
+          render();
+
+        }
+
+      })
+
+    );
+
+  });
+
+
+  if(state.members.length){
+
+    body.appendChild(list);
+
+  }else{
+
+    body.appendChild(
+      el("div",{
+        class:"empty",
+        text:"No members yet. Add your name below."
+      })
+    );
+
+  }
+
+
+  const add =
+    el("div",{class:"field"});
+
+
+  add.appendChild(
+    el("label",{text:"OR ADD NEW"})
+  );
+
+
+  const newNameInput =
+    el("input",{
+      placeholder:"your name",
+      value:state.newName
+    });
+
+
+  newNameInput.addEventListener(
+    "input",
+    e=>{
+      state.newName =
+        e.target.value;
+    }
+  );
+
+
+  add.appendChild(newNameInput);
+
+  body.appendChild(add);
+
+
+  body.appendChild(
+
+    el("button",{
+
+      class:"primary",
+
+      text:
+        state.isLoading
+          ? "Saving..."
+          : "Continue",
+
+      disabled:state.isLoading,
+
+      onclick:async()=>{
+
+        const name =
+          state.newName.trim();
+
+
+        if(!name){
+
+          state.formMsg = {
+            type:"err",
+            text:"Please enter a name."
+          };
+
+          render();
+
+          return;
+
+        }
+
+
+        if(state.members.includes(name)){
+
+          setCurrentUser(name);
+
+          state.view = "member";
+
+          state.newName = "";
+
+          render();
+
+          return;
+
+        }
+
+
+        state.isLoading = true;
+
+        render();
+
+
+        state.members.push(name);
+
+        /* Log the person in on this device immediately — keep
+           them even if the Firebase sync below fails, and cache
+           now so a refresh doesn't lose the new name. */
+
+        setCurrentUser(name);
+
+        state.newName = "";
+
+        state.view = "member";
+
+
+        try{
+
+          await saveMembers();
+
+          state.formMsg = null;
+
+        }catch(error){
+
+          state.formMsg = {
+            type:"info",
+            text:"⚠ Added on this device, but couldn't sync to Firebase yet (check Firebase Rules)."
+          };
+
+        }
+
+
+        state.isLoading = false;
+
+        render();
+
+      }
+
+    })
+
+  );
+
+
+  if(state.formMsg){
+
+    body.appendChild(
+
+      el("div",{
+
+        class:
+          "msg " +
+          state.formMsg.type,
+
+        text:
+          state.formMsg.text
+
+      })
+
+    );
+
+  }
+
+
+  slate.appendChild(body);
+
+  gateWrap.appendChild(slate);
+
+
+  /* ADMIN */
+
+  gateWrap.appendChild(
+    el("div",{
+      class:"divider",
+      text:"OR"
+    })
+  );
+
+
+  const adminSlate =
+    el("div",{class:"slate"});
+
+
+  adminSlate.appendChild(
+    el("div",{class:"slate-stripe"})
+  );
+
+
+  const adminBody =
+    el("div",{class:"slate-body"});
+
+
+  adminBody.appendChild(
+    el("h2",{text:"Admin"})
+  );
+
+
+  const passField =
+    el("div",{class:"field"});
+
+
+  passField.appendChild(
+    el("label",{text:"PASSCODE"})
+  );
+
+
+  const passInput =
+    el("input",{
+      type:"password",
+      placeholder:"enter passcode"
+    });
+
+
+  passInput.addEventListener(
+    "input",
+    e=>{
+      state.adminPass =
+        e.target.value;
+    }
+  );
+
+
+  passField.appendChild(passInput);
+
+  adminBody.appendChild(passField);
+
+
+  adminBody.appendChild(
+
+    el("button",{
+
+      class:"primary",
+
+      text:"Access Admin",
+
+      onclick:()=>{
+
+        if(
+          state.adminPass ===
+          ADMIN_PASSCODE
+        ){
+
+          state.view = "admin";
+
+          state.adminPass = "";
+
+          state.adminMsg = null;
+
+          render();
+
+        }else{
+
+          state.adminMsg = {
+            type:"err",
+            text:"❌ Wrong passcode"
+          };
+
+          render();
+
+        }
+
+      }
+
+    })
+
+  );
+
+
+  if(state.adminMsg){
+
+    adminBody.appendChild(
+
+      el("div",{
+
+        class:
+          "msg " +
+          state.adminMsg.type,
+
+        text:
+          state.adminMsg.text
+
+      })
+
+    );
+
+  }
+
+
+  adminSlate.appendChild(adminBody);
+
+  gateWrap.appendChild(adminSlate);
+
+
+  wrap.appendChild(gateWrap);
+
+
+  return wrap;
+
+}
+
+
+/* ============================================================
+   MEMBER DASHBOARD
+   ============================================================ */
+
+function renderMember(){
+
+  const wrap =
+    el("div",{class:"wrap"});
+
+
+  /* HEADER */
+
+  const lockup =
+    el("div",{class:"lockup"});
+
+
+  lockup.appendChild(
+
+    el("h1",{
+      text:"TEAM KABIRA — SHOOT LOG"
+    })
+
+  );
+
+
+  const who =
+    el("div",{class:"who"});
+
+
+  who.appendChild(
+    document.createTextNode(
+      state.currentUser
+    )
+  );
+
+
+  who.appendChild(
+
+    el("a",{
+
+      text:"switch",
+
+      onclick:()=>{
+
+        state.view = "gate";
+
+        localStorage.removeItem(
+          "currentUser"
+        );
+
+        state.currentUser = null;
+
+        render();
+
+      }
+
+    })
+
+  );
+
+
+  lockup.appendChild(who);
+
+  wrap.appendChild(lockup);
+
+
+  /* FORM */
+
+  const slate =
+    el("div",{class:"slate"});
+
+
+  slate.appendChild(
+    el("div",{class:"slate-stripe"})
+  );
+
+
+  const body =
+    el("div",{class:"slate-body"});
+
+
+  body.appendChild(
+    el("h2",{text:"Log a new shoot"})
+  );
+
+
+  /* BRAND + CONTENT */
+
+  const row2a =
+    el("div",{class:"row2"});
+
+
+  const brandField =
+    el("div",{class:"field"});
+
+
+  brandField.appendChild(
+    el("label",{text:"BRAND"})
+  );
+
+
+  const brandInput =
+    el("input",{
+      placeholder:"e.g. Nike",
+      value:state.form.brand
+    });
+
+
+  brandInput.addEventListener(
+    "input",
+    e=>{
+      state.form.brand =
+        e.target.value;
+    }
+  );
+
+
+  brandField.appendChild(brandInput);
+
+  row2a.appendChild(brandField);
+
+
+  const typeField =
+    el("div",{class:"field"});
+
+
+  typeField.appendChild(
+    el("label",{text:"CONTENT TYPE"})
+  );
+
+
+  const typeSelect =
+    el("select",{});
+
+
+  CONTENT_TYPES.forEach(type=>{
+
+    typeSelect.appendChild(
+
+      el("option",{
+        value:type,
+        text:type
+      })
+
+    );
+
+  });
+
+
+  typeSelect.value =
+    state.form.contentType;
+
+
+  typeSelect.addEventListener(
+    "change",
+    e=>{
+      state.form.contentType =
+        e.target.value;
+    }
+  );
+
+
+  typeField.appendChild(typeSelect);
+
+  row2a.appendChild(typeField);
+
+  body.appendChild(row2a);
+
+
+  /* DATE + STATUS */
+
+  const row2b =
+    el("div",{class:"row2"});
+
+
+  const dateField =
+    el("div",{class:"field"});
+
+
+  dateField.appendChild(
+    el("label",{text:"DATE"})
+  );
+
+
+  const dateInput =
+    el("input",{
+      type:"date",
+      value:state.form.date
+    });
+
+
+  dateInput.addEventListener(
+    "input",
+    e=>{
+      state.form.date =
+        e.target.value;
+    }
+  );
+
+
+  dateField.appendChild(dateInput);
+
+  row2b.appendChild(dateField);
+
+
+  const statusField =
+    el("div",{class:"field"});
+
+
+  statusField.appendChild(
+    el("label",{text:"TAKE / STATUS"})
+  );
+
+
+  const statusSelect =
+    el("select",{});
+
+
+  STATUSES.forEach(status=>{
+
+    statusSelect.appendChild(
+
+      el("option",{
+        value:status,
+        text:status
+      })
+
+    );
+
+  });
+
+
+  statusSelect.value =
+    state.form.status;
+
+
+  statusSelect.addEventListener(
+    "change",
+    e=>{
+      state.form.status =
+        e.target.value;
+    }
+  );
+
+
+  statusField.appendChild(statusSelect);
+
+  row2b.appendChild(statusField);
+
+  body.appendChild(row2b);
+
+
+  /* LOCATION */
+
+  const locField =
+    el("div",{class:"field"});
+
+
+  locField.appendChild(
+    el("label",{text:"LOCATION"})
+  );
+
+
+  const locInput =
+    el("input",{
+      placeholder:"e.g. Karjat farmhouse",
+      value:state.form.location
+    });
+
+
+  locInput.addEventListener(
+    "input",
+    e=>{
+      state.form.location =
+        e.target.value;
+    }
+  );
+
+
+  locField.appendChild(locInput);
+
+  body.appendChild(locField);
+
+
+  /* APPROVED / COORDINATOR / TOPIC */
+
+  const row3 =
+    el("div",{class:"row3"});
+
+
+  const approvedField =
+    el("div",{class:"field"});
+
+
+  approvedField.appendChild(
+    el("label",{text:"APPROVED BY"})
+  );
+
+
+  const approvedInput =
+    el("input",{
+      placeholder:"e.g. Client Name",
+      value:state.form.approvedBy
+    });
+
+
+  approvedInput.addEventListener(
+    "input",
+    e=>{
+      state.form.approvedBy =
+        e.target.value;
+    }
+  );
+
+
+  approvedField.appendChild(approvedInput);
+
+  row3.appendChild(approvedField);
+
+
+  const coordinatorField =
+    el("div",{class:"field"});
+
+
+  coordinatorField.appendChild(
+    el("label",{text:"COORDINATOR"})
+  );
+
+
+  const coordinatorInput =
+    el("input",{
+      placeholder:"e.g. Person Name",
+      value:state.form.coordinator
+    });
+
+
+  coordinatorInput.addEventListener(
+    "input",
+    e=>{
+      state.form.coordinator =
+        e.target.value;
+    }
+  );
+
+
+  coordinatorField.appendChild(
+    coordinatorInput
+  );
+
+  row3.appendChild(coordinatorField);
+
+
+  const reelField =
+    el("div",{class:"field"});
+
+
+  reelField.appendChild(
+    el("label",{text:"REEL TOPIC"})
+  );
+
+
+  const reelInput =
+    el("input",{
+      placeholder:"e.g. Product Launch",
+      value:state.form.reelTopic
+    });
+
+
+  reelInput.addEventListener(
+    "input",
+    e=>{
+      state.form.reelTopic =
+        e.target.value;
+    }
+  );
+
+
+  reelField.appendChild(reelInput);
+
+  row3.appendChild(reelField);
+
+  body.appendChild(row3);
+
+
+  /* PAY + TRAVEL */
+
+  const row3b =
+    el("div",{class:"row3"});
+
+
+  const payField =
+    el("div",{class:"field"});
+
+
+  payField.appendChild(
+    el("label",{text:"PAY (₹)"})
+  );
+
+
+  const payInput =
+    el("input",{
+      type:"number",
+      min:"0",
+      step:"0.01",
+      placeholder:"0",
+      value:state.form.pay
+    });
+
+
+  payInput.addEventListener(
+    "input",
+    e=>{
+      state.form.pay =
+        e.target.value;
+    }
+  );
+
+
+  payField.appendChild(payInput);
+
+  row3b.appendChild(payField);
+
+
+  const travelField =
+    el("div",{class:"field"});
+
+
+  travelField.appendChild(
+    el("label",{text:"TRAVEL (₹)"})
+  );
+
+
+  const travelInput =
+    el("input",{
+      type:"number",
+      min:"0",
+      step:"0.01",
+      placeholder:"0",
+      value:state.form.travel
+    });
+
+
+  travelInput.addEventListener(
+    "input",
+    e=>{
+      state.form.travel =
+        e.target.value;
+    }
+  );
+
+
+  travelField.appendChild(travelInput);
+
+  row3b.appendChild(travelField);
+
+
+  row3b.appendChild(
+    el("div",{class:"field"})
+  );
+
+
+  body.appendChild(row3b);
+
+
+  /* NOTES */
+
+  const notesField =
+    el("div",{class:"field"});
+
+
+  notesField.appendChild(
+    el("label",{
+      text:"NOTES / DRIVE LINK"
+    })
+  );
+
+
+  const notesInput =
+    el("textarea",{
+      placeholder:
+        "Anything the team should know..."
+    });
+
+
+  notesInput.value =
+    state.form.notes;
+
+
+  notesInput.addEventListener(
+    "input",
+    e=>{
+      state.form.notes =
+        e.target.value;
+    }
+  );
+
+
+  notesField.appendChild(notesInput);
+
+  body.appendChild(notesField);
+
+
+  /* SUBMIT */
+
+  body.appendChild(
+
+    el("button",{
+
+      class:"primary",
+
+      text:
+        state.isLoading
+          ? "Saving..."
+          : "Log this shoot",
+
+      disabled:state.isLoading,
+
+      onclick:submitEntry
+
+    })
+
+  );
+
+
+  if(state.formMsg){
+
+    body.appendChild(
+
+      el("div",{
+
+        class:
+          "msg " +
+          state.formMsg.type,
+
+        text:
+          state.formMsg.text
+
+      })
+
+    );
+
+  }
+
+
+  slate.appendChild(body);
+
+  wrap.appendChild(slate);
+
+
+  /* RECENT LOGS */
+
+  wrap.appendChild(
+
+    el("div",{
+      class:"section-title",
+      text:"YOUR RECENT LOGS"
+    })
+
+  );
+
+
+  const mine =
+    state.entries.filter(
+      entry =>
+        entry.member ===
+        state.currentUser
+    );
+
+
+  if(!mine.length){
+
+    wrap.appendChild(
+
+      el("div",{
+
+        class:"empty",
+
+        text:
+          "Nothing logged yet — fill the slate above once you shoot something."
+
+      })
+
+    );
+
+  }else{
+
+    const table =
+      el("table",{
+        class:"data-table"
+      });
+
+
+    const thead =
+      el("thead");
+
+
+    const headerRow =
+      el("tr");
+
+
+    [
+      "Date",
+      "Brand",
+      "Topic",
+      "Content",
+      "Approved By",
+      "Coordinator",
+      "Pay",
+      "Travel",
+      "Status"
+    ].forEach(header=>{
+
+      headerRow.appendChild(
+        el("th",{text:header})
+      );
+
+    });
+
+
+    thead.appendChild(headerRow);
+
+    table.appendChild(thead);
+
+
+    const tbody =
+      el("tbody");
+
+
+    mine.slice(0,25).forEach(entry=>{
+
+      const row =
+        el("tr");
+
+
+      row.appendChild(
+        el("td",{
+          text:fmtDate(entry.date)
+        })
+      );
+
+
+      row.appendChild(
+        el("td",{
+          text:entry.brand || "-"
+        })
+      );
+
+
+      row.appendChild(
+        el("td",{
+          text:entry.reelTopic || "-"
+        })
+      );
+
+
+      row.appendChild(
+        el("td",{
+          text:entry.contentType || "-"
+        })
+      );
+
+
+      row.appendChild(
+        el("td",{
+          text:entry.approvedBy || "-"
+        })
+      );
+
+
+      row.appendChild(
+        el("td",{
+          text:entry.coordinator || "-"
+        })
+      );
+
+
+      row.appendChild(
+        el("td",{
+          class:"number",
+          text:
+            "₹" +
+            Number(entry.pay || 0)
+              .toLocaleString("en-IN")
+        })
+      );
+
+
+      row.appendChild(
+        el("td",{
+          class:"number",
+          text:
+            "₹" +
+            Number(entry.travel || 0)
+              .toLocaleString("en-IN")
+        })
+      );
+
+
+      row.appendChild(
+        el("td",{
+          text:entry.status || "-"
+        })
+      );
+
+
+      tbody.appendChild(row);
+
+    });
+
+
+    table.appendChild(tbody);
+
+
+    const tableWrapper =
+      el("div",{
+        class:"table-wrapper"
+      });
+
+
+    tableWrapper.appendChild(table);
+
+    wrap.appendChild(tableWrapper);
+
+  }
+
+
+  /* ADMIN LINK */
+
+  const adminLink =
+    el("div",{
+      class:"admin-link"
+    });
+
+
+  adminLink.appendChild(
+
+    el("a",{
+
+      text:"Admin dashboard →",
+
+      onclick:()=>{
+
+        state.view =
+          "admin-gate";
+
+        state.adminMsg =
+          null;
+
+        render();
+
+      }
+
+    })
+
+  );
+
+
+  wrap.appendChild(adminLink);
+
+
+  return wrap;
+
+}
+
+
+/* ============================================================
+   EXPORT TO EXCEL (generic — used for "all" and "single member")
+   ============================================================ */
+
+function xlsxIsReady(){
+
+  return typeof XLSX !== "undefined";
+
+}
+
+function waitForXlsxThenRun(callback, attemptsLeft){
+
+  if(xlsxIsReady()){
+
+    callback();
+
+    return;
+
+  }
+
+
+  if(attemptsLeft === undefined){
+
+    attemptsLeft = 20;
+
+  }
+
+
+  if(attemptsLeft <= 0){
+
+    alert(
+      "Could not load the Excel library. Check your internet connection and refresh the page."
+    );
+
+    return;
+
+  }
+
+
+  /* The fallback CDN script may still be loading — retry briefly before giving up */
+
+  setTimeout(()=>{
+
+    waitForXlsxThenRun(callback, attemptsLeft - 1);
+
+  }, 250);
+
+}
+
+const EXPORT_COLUMNS = [
+  { header:"Date",         key:"date",         width:12 },
+  { header:"Member",       key:"member",       width:16 },
+  { header:"Brand",        key:"brand",        width:20 },
+  { header:"Reel Topic",   key:"reelTopic",    width:22 },
+  { header:"Content Type", key:"contentType",  width:14 },
+  { header:"Location",     key:"location",     width:22 },
+  { header:"Approved By",  key:"approvedBy",   width:18 },
+  { header:"Coordinator",  key:"coordinator",  width:18 },
+  { header:"Pay (₹)",      key:"pay",          width:12 },
+  { header:"Travel (₹)",   key:"travel",       width:12 },
+  { header:"Status",       key:"status",       width:12 },
+  { header:"Notes",        key:"notes",        width:40 }
+];
+
+function entriesToWorkbookAndDownload(entries, filename, sheetName){
+
+  /* Sort newest-first so the exported sheet reads top-to-bottom
+     the same way the site does. */
+
+  const sorted =
+    [...entries].sort(
+      (a,b) =>
+        new Date(b.date || 0) -
+        new Date(a.date || 0)
+    );
+
+
+  const data = [];
+
+
+  data.push(
+    EXPORT_COLUMNS.map(col => col.header)
+  );
+
+
+  sorted.forEach(entry=>{
+
+    data.push(
+
+      EXPORT_COLUMNS.map(col=>{
+
+        const value = entry[col.key];
+
+        if(col.key === "pay" || col.key === "travel"){
+
+          return Number(value || 0);
+
+        }
+
+        return value || "";
+
+      })
+
+    );
+
+  });
+
+
+  const worksheet =
+    XLSX.utils.aoa_to_sheet(data);
+
+
+  /* Column widths so the sheet is readable immediately instead
+     of every column being squeezed to default width. */
+
+  worksheet["!cols"] =
+    EXPORT_COLUMNS.map(col => ({ wch: col.width }));
+
+
+  /* Freeze the header row so it stays visible while scrolling
+     through a long sheet. */
+
+  worksheet["!freeze"] = { xSplit:0, ySplit:1 };
+
+  worksheet["!autofilter"] =
+    { ref: "A1:" + XLSX.utils.encode_col(EXPORT_COLUMNS.length - 1) + (sorted.length + 1) };
+
+
+  const workbook =
+    XLSX.utils.book_new();
+
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    worksheet,
+    (sheetName || "Shoots").slice(0, 31)
+  );
+
+
+  XLSX.writeFile(workbook, filename);
+
+}
+
+function exportToExcel(){
+
+  waitForXlsxThenRun(()=>{
+
+    entriesToWorkbookAndDownload(
+
+      state.entries,
+
+      "Team-Kabira-Shoots-" +
+        todayISO() +
+        ".xlsx",
+
+      "Shoots"
+
+    );
+
+  });
+
+}
+
+function exportMemberToExcel(memberName){
+
+  const stats =
+    getMemberStats(memberName);
+
+
+  if(!stats.entries.length){
+
+    alert(
+      "No records found for " +
+        memberName +
+        "."
+    );
+
+    return;
+
+  }
+
+
+  waitForXlsxThenRun(()=>{
+
+    const safeName =
+      memberName
+        .trim()
+        .replace(/[^a-z0-9]+/gi, "-");
+
+    entriesToWorkbookAndDownload(
+
+      stats.entries,
+
+      "Team-Kabira-" +
+        safeName +
+        "-" +
+        todayISO() +
+        ".xlsx",
+
+      memberName.slice(0, 28)
+
+    );
+
+  });
+
+}
+
+
+/* ============================================================
+   MEMBER STATISTICS
+   ============================================================ */
+
+function getMemberStats(memberName){
+
+  const normalized =
+    memberName.trim().toLowerCase();
+
+
+  const memberEntries =
+    state.entries.filter(
+
+      entry =>
+        String(entry.member || "")
+          .toLowerCase() ===
+        normalized
+
+    );
+
+
+  const totalShots =
+    memberEntries.length;
+
+
+  const delivered =
+    memberEntries.filter(
+      entry =>
+        entry.status === "Delivered"
+    ).length;
+
+
+  const totalPay =
+    memberEntries.reduce(
+
+      (sum,entry)=>
+        sum +
+        Number(entry.pay || 0),
+
+      0
+
+    );
+
+
+  const totalTravel =
+    memberEntries.reduce(
+
+      (sum,entry)=>
+        sum +
+        Number(entry.travel || 0),
+
+      0
+
+    );
+
+
+  return {
+
+    totalShots,
+
+    delivered,
+
+    totalPay,
+
+    totalTravel,
+
+    entries:memberEntries
+
+  };
+
+}
+
+
+/* ============================================================
+   ADMIN — EDIT / DELETE ENTRIES
+   ============================================================ */
+
+function openEditEntry(entry){
+
+  /* Work on a copy so cancelling doesn't mutate the real entry */
+
+  state.editingEntry = {
+
+    id: entry.id,
+
+    member: entry.member || "",
+
+    date: entry.date || todayISO(),
+
+    brand: entry.brand || "",
+
+    contentType: entry.contentType || CONTENT_TYPES[0],
+
+    location: entry.location || "",
+
+    status: entry.status || STATUSES[0],
+
+    notes: entry.notes || "",
+
+    approvedBy: entry.approvedBy || "",
+
+    coordinator: entry.coordinator || "",
+
+    reelTopic: entry.reelTopic || "",
+
+    pay: entry.pay ?? "",
+
+    travel: entry.travel ?? ""
+
+  };
+
+  state.editMsg = null;
+
+  render();
+
+  const anchor = document.getElementById("edit-entry-panel");
+
+  if(anchor){
+    anchor.scrollIntoView({ behavior:"smooth", block:"start" });
+  }
+
+}
+
+function closeEditEntry(){
+
+  state.editingEntry = null;
+
+  state.editMsg = null;
+
+  render();
+
+}
+
+async function saveEditEntry(){
+
+  if(!state.editingEntry) return;
+
+
+  if(!state.editingEntry.brand.trim()){
+
+    state.editMsg = { type:"err", text:"Brand is required." };
+
+    render();
+
+    return;
+
+  }
+
+
+  state.editSaving = true;
+
+  render();
+
+
+  const idx =
+    state.entries.findIndex(
+      e => e.id === state.editingEntry.id
+    );
+
+
+  if(idx === -1){
+
+    state.editSaving = false;
+
+    state.editMsg = { type:"err", text:"That entry no longer exists." };
+
+    render();
+
+    return;
+
+  }
+
+
+  const updated = {
+
+    ...state.entries[idx],
+
+    member: state.editingEntry.member.trim(),
+
+    date: state.editingEntry.date,
+
+    brand: state.editingEntry.brand.trim(),
+
+    contentType: state.editingEntry.contentType,
+
+    location: state.editingEntry.location.trim(),
+
+    status: state.editingEntry.status,
+
+    notes: state.editingEntry.notes.trim(),
+
+    approvedBy: state.editingEntry.approvedBy.trim(),
+
+    coordinator: state.editingEntry.coordinator.trim(),
+
+    reelTopic: state.editingEntry.reelTopic.trim(),
+
+    pay: state.editingEntry.pay ? parseFloat(state.editingEntry.pay) : 0,
+
+    travel: state.editingEntry.travel ? parseFloat(state.editingEntry.travel) : 0
+
+  };
+
+
+  state.entries[idx] = updated;
+
+  cacheEntries();
+
+
+  try{
+
+    await saveEntries();
+
+    state.editingEntry = null;
+
+    state.editMsg = null;
+
+  }catch(error){
+
+    state.editMsg = {
+      type:"info",
+      text:"⚠ Saved on this device — couldn't sync to Firebase yet (check Firebase Rules)."
+    };
+
+    state.editingEntry = null;
+
+  }
+
+
+  state.editSaving = false;
+
+  render();
+
+}
+
+async function deleteEntry(id){
+
+  const target =
+    state.entries.find(e => e.id === id);
+
+
+  const label =
+    target
+      ? (target.brand || "this shoot") + " — " + (target.member || "unknown")
+      : "this shoot";
+
+
+  if(!confirm("Delete " + label + "? This cannot be undone.")){
+
+    return;
+
+  }
+
+
+  state.entries =
+    state.entries.filter(e => e.id !== id);
+
+  cacheEntries();
+
+
+  if(
+    state.editingEntry &&
+    state.editingEntry.id === id
+  ){
+
+    state.editingEntry = null;
+
+  }
+
+
+  render();
+
+
+  try{
+
+    await saveEntries();
+
+  }catch(error){
+
+    console.error("Delete failed to sync to Firebase (removed locally, will retry on next sync):", error);
+
+  }
+
+}
+
+
+/* ============================================================
+   ADMIN — EDIT ENTRY PANEL
+   ============================================================ */
+
+function editField(key,label,inputEl){
+
+  const field = el("div",{class:"field"});
+
+  field.appendChild(el("label",{text:label}));
+
+  field.appendChild(inputEl);
+
+  return field;
+
+}
+
+function renderEditEntryPanel(){
+
+  const ee = state.editingEntry;
+
+
+  const slate = el("div",{class:"slate",id:"edit-entry-panel"});
+
+  slate.appendChild(el("div",{class:"slate-stripe"}));
+
+
+  const body = el("div",{class:"slate-body"});
+
+  body.appendChild(el("h2",{text:"Edit shoot"}));
+
+
+  /* MEMBER + BRAND */
+
+  const row2a = el("div",{class:"row2"});
+
+
+  const memberInput = el("input",{
+    placeholder:"member name",
+    value:ee.member
+  });
+
+  memberInput.addEventListener("input", e=>{ ee.member = e.target.value; });
+
+  row2a.appendChild(editField("member","MEMBER",memberInput));
+
+
+  const brandInput = el("input",{
+    placeholder:"e.g. Nike",
+    value:ee.brand
+  });
+
+  brandInput.addEventListener("input", e=>{ ee.brand = e.target.value; });
+
+  row2a.appendChild(editField("brand","BRAND",brandInput));
+
+  body.appendChild(row2a);
+
+
+  /* DATE + CONTENT TYPE */
+
+  const row2b = el("div",{class:"row2"});
+
+
+  const dateInput = el("input",{ type:"date", value:ee.date });
+
+  dateInput.addEventListener("input", e=>{ ee.date = e.target.value; });
+
+  row2b.appendChild(editField("date","DATE",dateInput));
+
+
+  const typeSelect = el("select",{});
+
+  CONTENT_TYPES.forEach(type=>{
+    typeSelect.appendChild(el("option",{ value:type, text:type }));
+  });
+
+  typeSelect.value = ee.contentType;
+
+  typeSelect.addEventListener("change", e=>{ ee.contentType = e.target.value; });
+
+  row2b.appendChild(editField("contentType","CONTENT TYPE",typeSelect));
+
+  body.appendChild(row2b);
+
+
+  /* STATUS + LOCATION */
+
+  const row2c = el("div",{class:"row2"});
+
+
+  const statusSelect = el("select",{});
+
+  STATUSES.forEach(status=>{
+    statusSelect.appendChild(el("option",{ value:status, text:status }));
+  });
+
+  statusSelect.value = ee.status;
+
+  statusSelect.addEventListener("change", e=>{ ee.status = e.target.value; });
+
+  row2c.appendChild(editField("status","TAKE / STATUS",statusSelect));
+
+
+  const locInput = el("input",{
+    placeholder:"e.g. Karjat farmhouse",
+    value:ee.location
+  });
+
+  locInput.addEventListener("input", e=>{ ee.location = e.target.value; });
+
+  row2c.appendChild(editField("location","LOCATION",locInput));
+
+  body.appendChild(row2c);
+
+
+  /* APPROVED / COORDINATOR / TOPIC */
+
+  const row3 = el("div",{class:"row3"});
+
+
+  const approvedInput = el("input",{
+    placeholder:"e.g. Client Name",
+    value:ee.approvedBy
+  });
+
+  approvedInput.addEventListener("input", e=>{ ee.approvedBy = e.target.value; });
+
+  row3.appendChild(editField("approvedBy","APPROVED BY",approvedInput));
+
+
+  const coordinatorInput = el("input",{
+    placeholder:"e.g. Person Name",
+    value:ee.coordinator
+  });
+
+  coordinatorInput.addEventListener("input", e=>{ ee.coordinator = e.target.value; });
+
+  row3.appendChild(editField("coordinator","COORDINATOR",coordinatorInput));
+
+
+  const reelInput = el("input",{
+    placeholder:"e.g. Product Launch",
+    value:ee.reelTopic
+  });
+
+  reelInput.addEventListener("input", e=>{ ee.reelTopic = e.target.value; });
+
+  row3.appendChild(editField("reelTopic","REEL TOPIC",reelInput));
+
+  body.appendChild(row3);
+
+
+  /* PAY + TRAVEL */
+
+  const row3b = el("div",{class:"row3"});
+
+
+  const payInput = el("input",{
+    type:"number", min:"0", step:"0.01", placeholder:"0",
+    value:ee.pay
+  });
+
+  payInput.addEventListener("input", e=>{ ee.pay = e.target.value; });
+
+  row3b.appendChild(editField("pay","PAY (₹)",payInput));
+
+
+  const travelInput = el("input",{
+    type:"number", min:"0", step:"0.01", placeholder:"0",
+    value:ee.travel
+  });
+
+  travelInput.addEventListener("input", e=>{ ee.travel = e.target.value; });
+
+  row3b.appendChild(editField("travel","TRAVEL (₹)",travelInput));
+
+  row3b.appendChild(el("div",{class:"field"}));
+
+  body.appendChild(row3b);
+
+
+  /* NOTES */
+
+  const notesInput = el("textarea",{
+    placeholder:"Anything the team should know..."
+  });
+
+  notesInput.value = ee.notes;
+
+  notesInput.addEventListener("input", e=>{ ee.notes = e.target.value; });
+
+  body.appendChild(editField("notes","NOTES / DRIVE LINK",notesInput));
+
+
+  /* ACTIONS */
+
+  const actions = el("div",{ class:"button-group" });
+
+
+  actions.appendChild(
+
+    el("button",{
+
+      class:"secondary",
+
+      text: state.editSaving ? "Saving..." : "💾 Save changes",
+
+      disabled: state.editSaving,
+
+      onclick: saveEditEntry
+
+    })
+
+  );
+
+
+  actions.appendChild(
+
+    el("button",{
+
+      class:"ghost",
+
+      text:"Cancel",
+
+      onclick: closeEditEntry
+
+    })
+
+  );
+
+
+  actions.appendChild(
+
+    el("button",{
+
+      class:"ghost",
+
+      text:"🗑 Delete",
+
+      style:"border-color:var(--accent);color:var(--accent);",
+
+      onclick: ()=>{ deleteEntry(ee.id); }
+
+    })
+
+  );
+
+
+  body.appendChild(actions);
+
+
+  if(state.editMsg){
+
+    body.appendChild(
+      el("div",{ class:"msg " + state.editMsg.type, text:state.editMsg.text })
+    );
+
+  }
+
+
+  slate.appendChild(body);
+
+
+  return slate;
+
+}
+
+
+/* ============================================================
+   ADMIN DASHBOARD
+   ============================================================ */
+
+function renderAdmin(){
+
+  const wrap =
+    el("div",{
+      class:"wrap wide"
+    });
+
+
+  /* HEADER */
+
+  const lockup =
+    el("div",{
+      class:"lockup"
+    });
+
+
+  lockup.appendChild(
+
+    el("h1",{
+      text:
+        "TEAM KABIRA — ADMIN DASHBOARD"
+    })
+
+  );
+
+
+  const who =
+    el("div",{
+      class:"who"
+    });
+
+
+  who.appendChild(
+    document.createTextNode(
+      "all members"
+    )
+  );
+
+
+  who.appendChild(
+
+    el("a",{
+
+      text:"exit",
+
+      onclick:()=>{
+
+        state.view =
+          state.currentUser
+            ? "member"
+            : "gate";
+
+        state.adminPass = "";
+
+        state.adminMsg = null;
+
+        render();
+
+      }
+
+    })
+
+  );
+
+
+  lockup.appendChild(who);
+
+  wrap.appendChild(lockup);
+
+
+  /* STATS */
+
+  const total =
+    state.entries.length;
+
+
+  const delivered =
+    state.entries.filter(
+      entry =>
+        entry.status === "Delivered"
+    ).length;
+
+
+  const editing =
+    state.entries.filter(
+      entry =>
+        entry.status === "Editing"
+    ).length;
+
+
+  const uniqueBrands =
+    new Set(
+
+      state.entries
+        .map(entry =>
+          String(entry.brand || "")
+            .trim()
+            .toLowerCase()
+        )
+        .filter(Boolean)
+
+    ).size;
+
+
+  const stats =
+    el("div",{
+      class:"stats"
+    });
+
+
+  [
+    [total,"Total logged"],
+    [delivered,"Delivered"],
+    [editing,"In editing"],
+    [uniqueBrands,"Brands shot"]
+  ].forEach(([number,label])=>{
+
+    const stat =
+      el("div",{
+        class:"stat"
+      });
+
+
+    stat.appendChild(
+      el("div",{
+        class:"n",
+        text:String(number)
+      })
+    );
+
+
+    stat.appendChild(
+      el("div",{
+        class:"l",
+        text:label
+      })
+    );
+
+
+    stats.appendChild(stat);
+
+  });
+
+
+  wrap.appendChild(stats);
+
+
+  /* EXPORT */
+
+  const buttonGroup =
+    el("div",{
+      class:"button-group"
+    });
+
+
+  buttonGroup.appendChild(
+
+    el("button",{
+
+      class:"secondary",
+
+      text:"📊 Export all to Excel",
+
+      onclick:exportToExcel
+
+    })
+
+  );
+
+
+  buttonGroup.appendChild(
+
+    el("button",{
+
+      class:"ghost",
+
+      text:"🔄 Sync now",
+
+      onclick:syncAllToFirebase
+
+    })
+
+  );
+
+
+  wrap.appendChild(buttonGroup);
+
+
+  if(state.syncMsg){
+
+    wrap.appendChild(
+
+      el("div",{
+        class:"msg " + state.syncMsg.type,
+        text:state.syncMsg.text
+      })
+
+    );
+
+  }
+
+
+  if(state.editingEntry){
+
+    wrap.appendChild(renderEditEntryPanel());
+
+  }
+
+
+  /* MEMBER SEARCH */
+
+  wrap.appendChild(
+
+    el("div",{
+      class:"section-title",
+      text:"SEARCH MEMBER"
+    })
+
+  );
+
+
+  const searchSection =
+    el("div",{
+      class:"search-section"
+    });
+
+
+  const searchBox =
+    el("div",{
+      class:"search-box"
+    });
+
+
+  const searchInput =
+    el("input",{
+      placeholder:"Enter member name",
+      value:state.searchMember
+    });
+
+
+  searchInput.addEventListener(
+    "input",
+    e=>{
+
+      state.searchMember =
+        e.target.value;
+
+      render();
+
+      /* Put cursor back in search box */
+
+      const newInput =
+        document.querySelector(
+          ".search-box input"
+        );
+
+      if(newInput){
+
+        newInput.focus();
+
+        newInput.setSelectionRange(
+          state.searchMember.length,
+          state.searchMember.length
+        );
+
+      }
+
+    }
+  );
+
+
+  searchBox.appendChild(searchInput);
+
+  searchSection.appendChild(searchBox);
+
+
+  if(state.searchMember.trim()){
+
+    const memberStats =
+      getMemberStats(
+        state.searchMember
+      );
+
+
+    if(memberStats.totalShots === 0){
+
+      searchSection.appendChild(
+
+        el("div",{
+
+          class:"empty",
+
+          text:
+            "No records found for this member."
+
+        })
+
+      );
+
+    }else{
+
+      /* PER-MEMBER EXPORT BUTTON */
+
+      const memberButtonGroup =
+        el("div",{
+          class:"button-group"
+        });
+
+
+      memberButtonGroup.appendChild(
+
+        el("button",{
+
+          class:"secondary",
+
+          text:
+            "📥 Export " +
+            state.searchMember.trim() +
+            "'s shoots",
+
+          onclick:()=>{
+
+            exportMemberToExcel(
+              state.searchMember.trim()
+            );
+
+          }
+
+        })
+
+      );
+
+
+      searchSection.appendChild(
+        memberButtonGroup
+      );
+
+
+      const memberStatsGrid =
+        el("div",{
+          class:"member-stats"
+        });
+
+
+      [
+        ["Total Shoots",memberStats.totalShots],
+
+        ["Delivered",memberStats.delivered],
+
+        [
+          "Total Pay",
+          "₹" +
+          memberStats.totalPay
+            .toLocaleString("en-IN")
+        ],
+
+        [
+          "Total Travel",
+          "₹" +
+          memberStats.totalTravel
+            .toLocaleString("en-IN")
+        ]
+
+      ].forEach(([label,value])=>{
+
+        const stat =
+          el("div",{
+            class:"member-stat"
+          });
+
+
+        stat.appendChild(
+
+          el("div",{
+            class:"label",
+            text:label
+          })
+
+        );
+
+
+        stat.appendChild(
+
+          el("div",{
+            class:"value",
+            text:String(value)
+          })
+
+        );
+
+
+        memberStatsGrid.appendChild(stat);
+
+      });
+
+
+      searchSection.appendChild(
+        memberStatsGrid
+      );
+
+
+      /* RECORDS */
+
+      const details =
+        el("div",{
+          class:"member-details"
+        });
+
+
+      details.appendChild(
+
+        el("h3",{
+          text:"Shoot Records"
+        })
+
+      );
+
+
+      const table =
+        el("table",{
+          class:"data-table"
+        });
+
+
+      const thead =
+        el("thead");
+
+
+      const headerRow =
+        el("tr");
+
+
+      [
+        "Date",
+        "Brand",
+        "Topic",
+        "Content",
+        "Approved By",
+        "Coordinator",
+        "Pay",
+        "Travel",
+        "Status",
+        "Actions"
+      ].forEach(header=>{
+
+        headerRow.appendChild(
+          el("th",{text:header})
+        );
+
+      });
+
+
+      thead.appendChild(headerRow);
+
+      table.appendChild(thead);
+
+
+      const tbody =
+        el("tbody");
+
+
+      memberStats.entries.forEach(entry=>{
+
+        const row =
+          el("tr");
+
+
+        row.appendChild(
+          el("td",{
+            text:fmtDate(entry.date)
+          })
+        );
+
+
+        row.appendChild(
+          el("td",{
+            text:entry.brand || "-"
+          })
+        );
+
+
+        row.appendChild(
+          el("td",{
+            text:entry.reelTopic || "-"
+          })
+        );
+
+
+        row.appendChild(
+          el("td",{
+            text:entry.contentType || "-"
+          })
+        );
+
+
+        row.appendChild(
+          el("td",{
+            text:entry.approvedBy || "-"
+          })
+        );
+
+
+        row.appendChild(
+          el("td",{
+            text:entry.coordinator || "-"
+          })
+        );
+
+
+        row.appendChild(
+          el("td",{
+            class:"number",
+            text:
+              "₹" +
+              Number(entry.pay || 0)
+                .toLocaleString("en-IN")
+          })
+        );
+
+
+        row.appendChild(
+          el("td",{
+            class:"number",
+            text:
+              "₹" +
+              Number(entry.travel || 0)
+                .toLocaleString("en-IN")
+          })
+        );
+
+
+        row.appendChild(
+          el("td",{
+            text:entry.status || "-"
+          })
+        );
+
+
+        const actionsCell = el("td",{});
+
+        actionsCell.appendChild(
+
+          el("a",{
+
+            text:"✏️ Edit",
+
+            style:"cursor:pointer;color:var(--amber);margin-right:10px;",
+
+            onclick:()=>{ openEditEntry(entry); }
+
+          })
+
+        );
+
+        actionsCell.appendChild(
+
+          el("a",{
+
+            text:"🗑 Delete",
+
+            style:"cursor:pointer;color:var(--accent);",
+
+            onclick:()=>{ deleteEntry(entry.id); }
+
+          })
+
+        );
+
+        row.appendChild(actionsCell);
+
+
+        tbody.appendChild(row);
+
+      });
+
+
+      table.appendChild(tbody);
+
+
+      const tableWrapper =
+        el("div",{
+          class:"table-wrapper"
+        });
+
+
+      tableWrapper.appendChild(table);
+
+      details.appendChild(tableWrapper);
+
+      searchSection.appendChild(details);
+
+    }
+
+  }
+
+
+  wrap.appendChild(searchSection);
+
+
+  /* SHOOTS PER MEMBER */
+
+  wrap.appendChild(
+
+    el("div",{
+      class:"section-title",
+      text:"SHOOTS PER MEMBER"
+    })
+
+  );
+
+
+  const counts = {};
+
+
+  state.entries.forEach(entry=>{
+
+    const name =
+      entry.member || "Unknown";
+
+
+    counts[name] =
+      (counts[name] || 0) + 1;
+
+  });
+
+
+  const countValues =
+    Object.values(counts);
+
+
+  const maxCount =
+    Math.max(
+      1,
+      ...countValues
+    );
+
+
+  const barsWrap =
+    el("div",{});
+
+
+  const allNames =
+    Array.from(
+
+      new Set([
+
+        ...state.members,
+
+        ...Object.keys(counts)
+
+      ])
+
+    );
+
+
+  if(!allNames.length){
+
+    barsWrap.appendChild(
+
+      el("div",{
+        class:"empty",
+        text:"No members yet."
+      })
+
+    );
+
+  }else{
+
+    allNames.forEach(name=>{
+
+      const count =
+        counts[name] || 0;
+
+
+      const row =
+        el("div",{
+          class:"bar-row"
+        });
+
+
+      row.appendChild(
+
+        el("div",{
+          class:"name",
+          text:name
+        })
+
+      );
+
+
+      const track =
+        el("div",{
+          class:"bar-track"
+        });
+
+
+      const fill =
+        el("div",{
+          class:"bar-fill"
+        });
+
+
+      fill.style.width =
+        Math.round(
+          (count / maxCount) * 100
+        ) + "%";
+
+
+      track.appendChild(fill);
+
+      row.appendChild(track);
+
+
+      row.appendChild(
+
+        el("div",{
+          class:"cnt",
+          text:String(count)
+        })
+
+      );
+
+
+      /* Quick per-member export button on each bar row */
+
+      row.appendChild(
+
+        el("a",{
+
+          text:"⬇",
+
+          title:
+            "Export " +
+            name +
+            "'s shoots",
+
+          style:
+            "margin-left:8px;cursor:pointer;color:var(--ink-dim);font-family:'Space Mono',monospace;font-size:13px;",
+
+          onclick:()=>{
+
+            exportMemberToExcel(name);
+
+          }
+
+        })
+
+      );
+
+
+      barsWrap.appendChild(row);
+
+    });
+
+  }
+
+
+  wrap.appendChild(barsWrap);
+
+
+  /* ALL LOGS */
+
+  wrap.appendChild(
+
+    el("div",{
+      class:"section-title",
+      text:"ALL LOGS TABLE"
+    })
+
+  );
+
+
+  const table =
+    el("table",{
+      class:"data-table"
+    });
+
+
+  const thead =
+    el("thead");
+
+
+  const headerRow =
+    el("tr");
+
+
+  [
+    "Date",
+    "Member",
+    "Brand",
+    "Topic",
+    "Content",
+    "Approved By",
+    "Coordinator",
+    "Pay",
+    "Travel",
+    "Status",
+    "Actions"
+  ].forEach(header=>{
+
+    headerRow.appendChild(
+      el("th",{text:header})
+    );
+
+  });
+
+
+  thead.appendChild(headerRow);
+
+  table.appendChild(thead);
+
+
+  const tbody =
+    el("tbody");
+
+
+  if(!state.entries.length){
+
+    const row =
+      el("tr");
+
+
+    row.appendChild(
+
+      el("td",{
+
+        colSpan:"11",
+
+        text:"No logs found",
+
+        style:
+          "text-align:center;padding:20px;color:var(--ink-dim)"
+
+      })
+
+    );
+
+
+    tbody.appendChild(row);
+
+  }else{
+
+    state.entries.forEach(entry=>{
+
+      const row =
+        el("tr");
+
+
+      row.appendChild(
+        el("td",{
+          text:fmtDate(entry.date)
+        })
+      );
+
+
+      row.appendChild(
+        el("td",{
+          text:entry.member || "-"
+        })
+      );
+
+
+      row.appendChild(
+        el("td",{
+          text:entry.brand || "-"
+        })
+      );
+
+
+      row.appendChild(
+        el("td",{
+          text:entry.reelTopic || "-"
+        })
+      );
+
+
+      row.appendChild(
+        el("td",{
+          text:entry.contentType || "-"
+        })
+      );
+
+
+      row.appendChild(
+        el("td",{
+          text:entry.approvedBy || "-"
+        })
+      );
+
+
+      row.appendChild(
+        el("td",{
+          text:entry.coordinator || "-"
+        })
+      );
+
+
+      row.appendChild(
+        el("td",{
+          class:"number",
+          text:
+            "₹" +
+            Number(entry.pay || 0)
+              .toLocaleString("en-IN")
+        })
+      );
+
+
+      row.appendChild(
+        el("td",{
+          class:"number",
+          text:
+            "₹" +
+            Number(entry.travel || 0)
+              .toLocaleString("en-IN")
+        })
+      );
+
+
+      row.appendChild(
+        el("td",{
+          text:entry.status || "-"
+        })
+      );
+
+
+      const actionsCell = el("td",{});
+
+      actionsCell.appendChild(
+
+        el("a",{
+
+          text:"✏️ Edit",
+
+          style:"cursor:pointer;color:var(--amber);margin-right:10px;",
+
+          onclick:()=>{ openEditEntry(entry); }
+
+        })
+
+      );
+
+      actionsCell.appendChild(
+
+        el("a",{
+
+          text:"🗑 Delete",
+
+          style:"cursor:pointer;color:var(--accent);",
+
+          onclick:()=>{ deleteEntry(entry.id); }
+
+        })
+
+      );
+
+      row.appendChild(actionsCell);
+
+
+      tbody.appendChild(row);
+
+    });
+
+  }
+
+
+  table.appendChild(tbody);
+
+
+  const tableWrapper =
+    el("div",{
+      class:"table-wrapper"
+    });
+
+
+  tableWrapper.appendChild(table);
+
+  wrap.appendChild(tableWrapper);
+
+
+  return wrap;
+
+}
+
+
+/* ============================================================
+   ADMIN LOGIN
+   ============================================================ */
+
+function renderAdminGate(){
+
+  const wrap =
+    el("div",{
+      class:"wrap"
+    });
+
+
+  const slate =
+    el("div",{
+      class:"slate"
+    });
+
+
+  slate.appendChild(
+    el("div",{
+      class:"slate-stripe"
+    })
+  );
+
+
+  const body =
+    el("div",{
+      class:"slate-body"
+    });
+
+
+  body.appendChild(
+
+    el("h2",{
+      text:"Admin Passcode"
+    })
+
+  );
+
+
+  const passField =
+    el("div",{
+      class:"field"
+    });
+
+
+  passField.appendChild(
+
+    el("label",{
+      text:"ENTER PASSCODE"
+    })
+
+  );
+
+
+  const passInput =
+    el("input",{
+      type:"password",
+      placeholder:"enter passcode"
+    });
+
+
+  passInput.addEventListener(
+    "input",
+    e=>{
+      state.adminPass =
+        e.target.value;
+    }
+  );
+
+
+  passInput.addEventListener(
+    "keydown",
+    e=>{
+
+      if(e.key === "Enter"){
+
+        attemptAdminLogin();
+
+      }
+
+    }
+  );
+
+
+  passField.appendChild(passInput);
+
+  body.appendChild(passField);
+
+
+  body.appendChild(
+
+    el("button",{
+
+      class:"primary",
+
+      text:"Enter Admin",
+
+      onclick:attemptAdminLogin
+
+    })
+
+  );
+
+
+  if(state.adminMsg){
+
+    body.appendChild(
+
+      el("div",{
+
+        class:
+          "msg " +
+          state.adminMsg.type,
+
+        text:
+          state.adminMsg.text
+
+      })
+
+    );
+
+  }
+
+
+  slate.appendChild(body);
+
+  wrap.appendChild(slate);
+
+
+  return wrap;
+
+}
+
+
+/* ============================================================
+   ADMIN LOGIN FUNCTION
+   ============================================================ */
+
+function attemptAdminLogin(){
+
+  if(
+    state.adminPass ===
+    ADMIN_PASSCODE
+  ){
+
+    state.view = "admin";
+
+    state.adminPass = "";
+
+    state.adminMsg = null;
+
+    render();
+
+  }else{
+
+    state.adminMsg = {
+
+      type:"err",
+
+      text:"❌ Wrong passcode"
+
+    };
+
+    render();
+
+  }
+
+}
+
+
+/* ============================================================
+   MAIN RENDER
+   ============================================================ */
+
+function render(){
+
+  const app =
+    document.getElementById("app");
+
+
+  app.innerHTML = "";
+
+
+  if(state.view === "loading"){
+
+    app.appendChild(
+
+      el("div",{
+
+        class:"wrap",
+
+        style:
+          "text-align:center;padding-top:100px;color:var(--ink-dim);font-family:'Space Mono',monospace;font-size:13px;",
+
+        html:
+          '<div class="loading-spinner"></div><p>Connecting to Team Kabira...</p>'
+
+      })
+
+    );
+
+    return;
+
+  }
+
+
+  if(state.view === "error"){
+
+    app.appendChild(
+
+      el("div",{
+
+        class:"wrap",
+
+        style:
+          "text-align:center;padding-top:100px;color:var(--accent);font-family:'Space Mono',monospace;font-size:13px;",
+
+        html:
+          `
+          <h2>Firebase Connection Error</h2>
+          <p>${state.errorMsg}</p>
+          <button class="ghost" onclick="location.reload()">
+            Retry
+          </button>
+          `
+
+      })
+
+    );
+
+    return;
+
+  }
+
+
+  if(state.view === "gate"){
+
+    app.appendChild(
+      renderGate()
+    );
+
+  }
+
+  else if(state.view === "admin-gate"){
+
+    app.appendChild(
+      renderAdminGate()
+    );
+
+  }
+
+  else if(state.view === "member"){
+
+    app.appendChild(
+      renderMember()
+    );
+
+  }
+
+  else if(state.view === "admin"){
+
+    app.appendChild(
+      renderAdmin()
+    );
+
+  }
+
+}
+
+
+/* ============================================================
+   START APPLICATION
+   ============================================================ */
+
+window.addEventListener(
+  "load",
+  loadAll
+);
+
+</script>
+
+</body>
+</html>
