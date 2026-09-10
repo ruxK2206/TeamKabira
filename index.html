@@ -7,7 +7,7 @@
 <title>Team Kabira — Shoot Log</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <!-- Excel export (with fallback CDN if the primary one is blocked/fails) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"
@@ -20,16 +20,16 @@
 
 <style>
   :root{
-    --bg:#14131A;
-    --panel:#1C1B23;
-    --panel-alt:#232230;
-    --ink:#F2F0EA;
-    --ink-dim:#948FA0;
-    --rule:#34323F;
-    --accent:#E63946;
-    --accent-soft:rgba(230,57,70,0.16);
-    --amber:#F2B705;
-    --green:#5FBF7A;
+    --bg:#F4F5F8;
+    --panel:#FFFFFF;
+    --panel-alt:#F0F2F6;
+    --ink:#22242C;
+    --ink-dim:#6B6F7B;
+    --rule:#E1E4EA;
+    --accent:#2F6FED;
+    --accent-soft:rgba(47,111,237,0.10);
+    --amber:#B8860B;
+    --green:#1E8E5A;
   }
 
   *{
@@ -40,7 +40,7 @@
     margin:0;
     background:var(--bg);
     color:var(--ink);
-    font-family:'Space Grotesk',sans-serif;
+    font-family:'Inter',sans-serif;
     min-height:100vh;
     padding:32px 18px 60px;
   }
@@ -71,7 +71,7 @@
   }
 
   .lockup .who{
-    font-family:'Space Mono',monospace;
+    font-family:'Inter',sans-serif;
     font-size:12px;
     color:var(--ink-dim);
   }
@@ -87,6 +87,36 @@
     text-decoration:underline;
   }
 
+  .conn-badge{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-family:'Inter',sans-serif;
+    font-size:11px;
+    padding:4px 10px;
+    border-radius:20px;
+    border:1px solid var(--rule);
+    cursor:default;
+    white-space:nowrap;
+  }
+
+  .conn-badge.checking{
+    color:var(--ink-dim);
+  }
+
+  .conn-badge.ok{
+    color:var(--green);
+    border-color:rgba(95,191,122,0.4);
+    background:rgba(95,191,122,0.08);
+  }
+
+  .conn-badge.bad{
+    color:var(--accent);
+    border-color:rgba(230,57,70,0.4);
+    background:rgba(230,57,70,0.08);
+    cursor:help;
+  }
+
   .slate{
     background:var(--panel);
     border-radius:6px;
@@ -95,12 +125,8 @@
   }
 
   .slate-stripe{
-    height:20px;
-    background:repeating-linear-gradient(
-      -45deg,
-      #EDEBE3 0 18px,
-      #14131A 18px 36px
-    );
+    height:6px;
+    background:var(--accent);
   }
 
   .slate-body{
@@ -113,10 +139,10 @@
 
   .field label{
     display:block;
-    font-family:'Space Mono',monospace;
-    font-size:11px;
-    letter-spacing:0.06em;
-    color:var(--ink-dim);
+    font-family:'Inter',sans-serif;
+    font-size:13.5px;
+    font-weight:600;
+    color:var(--ink);
     margin-bottom:6px;
   }
 
@@ -128,7 +154,7 @@
     border:1px solid var(--rule);
     border-radius:4px;
     color:var(--ink);
-    font-family:'Space Grotesk',sans-serif;
+    font-family:'Inter',sans-serif;
     font-size:15px;
     padding:10px 12px;
   }
@@ -170,7 +196,7 @@
     color:#fff;
     border:none;
     border-radius:4px;
-    font-family:'Space Grotesk',sans-serif;
+    font-family:'Inter',sans-serif;
     font-weight:600;
     font-size:15px;
     padding:13px;
@@ -192,7 +218,7 @@
     color:#fff;
     border:none;
     border-radius:4px;
-    font-family:'Space Grotesk',sans-serif;
+    font-family:'Inter',sans-serif;
     font-weight:600;
     font-size:14px;
     padding:10px 16px;
@@ -209,7 +235,7 @@
     border:1px solid var(--rule);
     color:var(--ink);
     border-radius:4px;
-    font-family:'Space Grotesk',sans-serif;
+    font-family:'Inter',sans-serif;
     font-size:13px;
     padding:9px 14px;
     cursor:pointer;
@@ -220,8 +246,74 @@
     color:var(--accent);
   }
 
+  button.btn-small{
+    background:var(--panel-alt);
+    border:1px solid var(--rule);
+    color:var(--ink);
+    border-radius:6px;
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:12.5px;
+    padding:6px 13px;
+    cursor:pointer;
+    margin-left:8px;
+  }
+
+  button.btn-small:hover{
+    border-color:var(--accent);
+    color:var(--accent);
+  }
+
+  button.btn-edit,
+  button.btn-delete{
+    border:1px solid var(--rule);
+    border-radius:6px;
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:12px;
+    padding:6px 11px;
+    cursor:pointer;
+    margin-right:8px;
+    background:var(--panel-alt);
+  }
+
+  button.btn-edit{
+    color:var(--amber);
+    border-color:rgba(184,134,11,0.35);
+  }
+
+  button.btn-edit:hover{
+    background:rgba(184,134,11,0.10);
+  }
+
+  button.btn-delete{
+    color:var(--accent);
+    border-color:rgba(230,57,70,0.35);
+    margin-right:0;
+  }
+
+  button.btn-delete:hover{
+    background:rgba(230,57,70,0.08);
+  }
+
+  button.btn-icon{
+    background:var(--panel-alt);
+    border:1px solid var(--rule);
+    color:var(--ink-dim);
+    border-radius:6px;
+    font-size:13px;
+    padding:5px 9px;
+    cursor:pointer;
+    margin-left:8px;
+  }
+
+  button.btn-icon:hover{
+    border-color:var(--accent);
+    color:var(--accent);
+  }
+
   .msg{
-    font-family:'Space Mono',monospace;
+    font-family:'Inter',sans-serif;
     font-size:12px;
     margin-top:10px;
     min-height:14px;
@@ -240,10 +332,10 @@
   }
 
   .section-title{
-    font-family:'Space Mono',monospace;
-    font-size:11px;
-    letter-spacing:0.08em;
-    color:var(--ink-dim);
+    font-family:'Inter',sans-serif;
+    font-size:16px;
+    font-weight:700;
+    color:var(--ink);
     margin:30px 0 12px;
   }
 
@@ -256,7 +348,7 @@
   }
 
   .entry .tc{
-    font-family:'Space Mono',monospace;
+    font-family:'Inter',sans-serif;
     font-size:12px;
     color:var(--ink-dim);
     width:78px;
@@ -281,14 +373,14 @@
   }
 
   .entry .member{
-    font-family:'Space Mono',monospace;
+    font-family:'Inter',sans-serif;
     font-size:11px;
     color:var(--ink-dim);
   }
 
   .badge{
     display:inline-block;
-    font-family:'Space Mono',monospace;
+    font-family:'Inter',sans-serif;
     font-size:10.5px;
     letter-spacing:0.04em;
     padding:2px 8px;
@@ -316,7 +408,7 @@
     color:var(--ink-dim);
     font-size:13.5px;
     padding:20px 0;
-    font-family:'Space Mono',monospace;
+    font-family:'Inter',sans-serif;
   }
 
   .table-wrapper{
@@ -341,7 +433,7 @@
   .data-table th{
     padding:12px;
     text-align:left;
-    font-family:'Space Mono',monospace;
+    font-family:'Inter',sans-serif;
     font-size:11px;
     letter-spacing:0.06em;
     color:var(--ink-dim);
@@ -361,7 +453,7 @@
 
   .data-table .number{
     text-align:right;
-    font-family:'Space Mono',monospace;
+    font-family:'Inter',sans-serif;
   }
 
   .search-section{
@@ -384,7 +476,7 @@
     border:1px solid var(--rule);
     border-radius:4px;
     color:var(--ink);
-    font-family:'Space Grotesk',sans-serif;
+    font-family:'Inter',sans-serif;
     font-size:15px;
     padding:10px 12px;
   }
@@ -415,7 +507,7 @@
   }
 
   .member-stat .label{
-    font-family:'Space Mono',monospace;
+    font-family:'Inter',sans-serif;
     font-size:11px;
     color:var(--ink-dim);
     margin-bottom:8px;
@@ -458,24 +550,28 @@
   }
 
   .namelist{
-    display:flex;
-    flex-wrap:wrap;
-    gap:8px;
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));
+    gap:10px;
     margin-bottom:14px;
   }
 
   .namechip{
-    font-family:'Space Mono',monospace;
-    font-size:12.5px;
-    padding:7px 12px;
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    font-weight:600;
+    text-align:center;
+    padding:12px 10px;
     border:1px solid var(--rule);
-    border-radius:20px;
+    border-radius:8px;
     cursor:pointer;
     background:var(--panel-alt);
+    box-shadow:0 1px 2px rgba(20,20,30,0.04);
   }
 
   .namechip:hover{
     border-color:var(--accent);
+    box-shadow:0 2px 6px rgba(47,111,237,0.15);
   }
 
   .namechip.active{
@@ -490,7 +586,7 @@
     gap:10px;
     margin:16px 0;
     color:var(--ink-dim);
-    font-family:'Space Mono',monospace;
+    font-family:'Inter',sans-serif;
     font-size:10.5px;
   }
 
@@ -509,7 +605,7 @@
 
   .admin-link a{
     color:var(--ink-dim);
-    font-family:'Space Mono',monospace;
+    font-family:'Inter',sans-serif;
     font-size:11.5px;
     cursor:pointer;
     text-decoration:none;
@@ -540,7 +636,7 @@
   }
 
   .stat .n{
-    font-family:'Space Mono',monospace;
+    font-family:'Inter',sans-serif;
     font-size:24px;
     font-weight:700;
   }
@@ -562,7 +658,7 @@
     background:var(--panel-alt);
     border:1px solid var(--rule);
     color:var(--ink);
-    font-family:'Space Mono',monospace;
+    font-family:'Inter',sans-serif;
     font-size:12px;
     padding:8px 10px;
     border-radius:4px;
@@ -578,7 +674,7 @@
   .bar-row .name{
     width:110px;
     flex-shrink:0;
-    font-family:'Space Mono',monospace;
+    font-family:'Inter',sans-serif;
     font-size:12px;
     overflow:hidden;
     text-overflow:ellipsis;
@@ -601,7 +697,7 @@
   .bar-row .cnt{
     width:22px;
     text-align:right;
-    font-family:'Space Mono',monospace;
+    font-family:'Inter',sans-serif;
     font-size:12px;
     color:var(--ink-dim);
   }
@@ -613,7 +709,7 @@
 
   .reset-link a{
     color:var(--ink-dim);
-    font-family:'Space Mono',monospace;
+    font-family:'Inter',sans-serif;
     font-size:10.5px;
     cursor:pointer;
     text-decoration:underline;
@@ -644,7 +740,7 @@
 
   .firebase-status{
     margin-top:8px;
-    font-family:'Space Mono',monospace;
+    font-family:'Inter',sans-serif;
     font-size:10px;
     color:var(--ink-dim);
   }
@@ -799,7 +895,9 @@ let state = {
 
   editMsg: null,
 
-  syncMsg: null
+  syncMsg: null,
+
+  connectionStatus: { state:"checking", reason:null }
 
 };
 
@@ -894,6 +992,72 @@ function loadCachedMembers(){
 
 
 /* ============================================================
+   REAL CONNECTION TEST
+
+   This is the important addition: earlier, a failed Firebase
+   write/read was only logged to the browser console, so the
+   app looked "fine" on the device that made it (because of the
+   local cache) while silently never reaching Firebase at all —
+   which is exactly why other devices saw nothing. This does an
+   actual write + read round trip against the database so we
+   know for certain whether syncing is really working, and shows
+   it in the UI instead of hiding it in the console.
+   ============================================================ */
+
+async function testFirebaseConnection(){
+
+  if(!db){
+
+    return { state:"bad", reason:"Firebase failed to initialize" };
+
+  }
+
+  try{
+
+    const ref = db.ref("_connectionTest");
+
+    await ref.set({ ts: Date.now() });
+
+    const snap = await ref.once("value");
+
+    if(snap.exists()){
+
+      return { state:"ok", reason:null };
+
+    }
+
+    return {
+      state:"bad",
+      reason:"Write succeeded but read-back returned nothing — check Database Rules"
+    };
+
+  }catch(error){
+
+    return {
+      state:"bad",
+      reason:
+        (error && error.message) ||
+        "Firebase rejected the request — check Database Rules"
+    };
+
+  }
+
+}
+
+async function refreshConnectionStatus(){
+
+  state.connectionStatus = { state:"checking", reason:null };
+
+  render();
+
+  state.connectionStatus = await testFirebaseConnection();
+
+  render();
+
+}
+
+
+/* ============================================================
    LOAD ALL DATA
    ============================================================ */
 
@@ -915,6 +1079,8 @@ async function loadAll(){
 
     state.errorMsg =
       "Firebase failed to initialize. Check the Firebase configuration.";
+
+    state.connectionStatus = { state:"bad", reason:"Firebase failed to initialize" };
 
     render();
 
@@ -1027,6 +1193,13 @@ async function loadAll(){
 
 
   render();
+
+
+  /* Run the real read+write round-trip test after the first
+     paint so the UI shows an honest, verified sync status
+     instead of just "it loaded so it must be fine". */
+
+  refreshConnectionStatus();
 
 }
 
@@ -1168,6 +1341,9 @@ async function syncAllToFirebase(){
 
 
   render();
+
+
+  refreshConnectionStatus();
 
 
   setTimeout(()=>{
@@ -1327,6 +1503,8 @@ async function submitEntry(){
       text:"✓ Shoot logged successfully!"
     };
 
+    state.connectionStatus = { state:"ok", reason:null };
+
   }catch(error){
 
     /* Keep the entry locally — do NOT remove it. It's saved on
@@ -1336,6 +1514,11 @@ async function submitEntry(){
     state.formMsg = {
       type:"info",
       text:"⚠ Saved on this device, but couldn't sync to Firebase yet (check Firebase Rules). It will retry automatically."
+    };
+
+    state.connectionStatus = {
+      state:"bad",
+      reason: (error && error.message) || "Firebase rejected the write — check Database Rules"
     };
 
     console.error(error);
@@ -1434,16 +1617,68 @@ function el(tag,attrs={}){
     elem.style.cssText = attrs.style;
 
 
+  if(attrs.title)
+    elem.title = attrs.title;
+
+
   delete attrs.text;
   delete attrs.html;
   delete attrs.onclick;
   delete attrs.style;
+  delete attrs.title;
 
 
   Object.assign(elem,attrs);
 
 
   return elem;
+
+}
+
+
+/* ============================================================
+   CONNECTION BADGE (shown in every header)
+   ============================================================ */
+
+function renderConnectionBadge(){
+
+  const status = state.connectionStatus || { state:"checking" };
+
+
+  let cls = "checking";
+
+  let label = "Checking connection...";
+
+  let title = "";
+
+
+  if(status.state === "ok"){
+
+    cls = "ok";
+
+    label = "🟢 Saved online";
+
+  }else if(status.state === "bad"){
+
+    cls = "bad";
+
+    label = "🔴 Not saved online yet";
+
+    title =
+      "Your entries are safe on this device, but they haven't reached the shared cloud storage yet, so other people won't see them. (For the team leader: check Firebase Database Rules.)";
+
+  }
+
+
+  return el("span",{
+
+    class:"conn-badge " + cls,
+
+    text:label,
+
+    title:title
+
+  });
 
 }
 
@@ -1465,6 +1700,9 @@ function renderGate(){
   lockup.appendChild(
     el("h1",{text:"TEAM KABIRA"})
   );
+
+
+  lockup.appendChild(renderConnectionBadge());
 
 
   wrap.appendChild(lockup);
@@ -1490,13 +1728,13 @@ function renderGate(){
 
 
   body.appendChild(
-    el("h2",{text:"Who are you?"})
+    el("h2",{text:"Step 1: Pick your name"})
   );
 
 
   body.appendChild(
     el("p",{
-      text:"Select your name to continue."
+      text:"Tap your name to continue."
     })
   );
 
@@ -1509,7 +1747,7 @@ function renderGate(){
 
     list.appendChild(
 
-      el("div",{
+      el("button",{
 
         class:"namechip",
 
@@ -1541,7 +1779,7 @@ function renderGate(){
     body.appendChild(
       el("div",{
         class:"empty",
-        text:"No members yet. Add your name below."
+        text:"No names added yet. Add yours below."
       })
     );
 
@@ -1553,7 +1791,7 @@ function renderGate(){
 
 
   add.appendChild(
-    el("label",{text:"OR ADD NEW"})
+    el("label",{text:"Or add your name"})
   );
 
 
@@ -1720,7 +1958,7 @@ function renderGate(){
 
 
   adminBody.appendChild(
-    el("h2",{text:"Admin"})
+    el("h2",{text:"Team leader login"})
   );
 
 
@@ -1729,7 +1967,7 @@ function renderGate(){
 
 
   passField.appendChild(
-    el("label",{text:"PASSCODE"})
+    el("label",{text:"Passcode"})
   );
 
 
@@ -1760,7 +1998,7 @@ function renderGate(){
 
       class:"primary",
 
-      text:"Access Admin",
+      text:"Enter",
 
       onclick:()=>{
 
@@ -1847,7 +2085,7 @@ function renderMember(){
   lockup.appendChild(
 
     el("h1",{
-      text:"TEAM KABIRA — SHOOT LOG"
+      text:"Team Kabira - Shoot Log"
     })
 
   );
@@ -1866,9 +2104,11 @@ function renderMember(){
 
   who.appendChild(
 
-    el("a",{
+    el("button",{
 
-      text:"switch",
+      class:"btn-small",
+
+      text:"Switch person",
 
       onclick:()=>{
 
@@ -1891,6 +2131,8 @@ function renderMember(){
 
   lockup.appendChild(who);
 
+  lockup.appendChild(renderConnectionBadge());
+
   wrap.appendChild(lockup);
 
 
@@ -1910,7 +2152,7 @@ function renderMember(){
 
 
   body.appendChild(
-    el("h2",{text:"Log a new shoot"})
+    el("h2",{text:"Step 2: Add today's shoot"})
   );
 
 
@@ -1925,7 +2167,7 @@ function renderMember(){
 
 
   brandField.appendChild(
-    el("label",{text:"BRAND"})
+    el("label",{text:"Brand"})
   );
 
 
@@ -1955,7 +2197,7 @@ function renderMember(){
 
 
   typeField.appendChild(
-    el("label",{text:"CONTENT TYPE"})
+    el("label",{text:"Type of content"})
   );
 
 
@@ -2008,7 +2250,7 @@ function renderMember(){
 
 
   dateField.appendChild(
-    el("label",{text:"DATE"})
+    el("label",{text:"Date"})
   );
 
 
@@ -2038,7 +2280,7 @@ function renderMember(){
 
 
   statusField.appendChild(
-    el("label",{text:"TAKE / STATUS"})
+    el("label",{text:"Status"})
   );
 
 
@@ -2087,7 +2329,7 @@ function renderMember(){
 
 
   locField.appendChild(
-    el("label",{text:"LOCATION"})
+    el("label",{text:"Location"})
   );
 
 
@@ -2123,7 +2365,7 @@ function renderMember(){
 
 
   approvedField.appendChild(
-    el("label",{text:"APPROVED BY"})
+    el("label",{text:"Approved by"})
   );
 
 
@@ -2153,7 +2395,7 @@ function renderMember(){
 
 
   coordinatorField.appendChild(
-    el("label",{text:"COORDINATOR"})
+    el("label",{text:"Coordinator"})
   );
 
 
@@ -2185,7 +2427,7 @@ function renderMember(){
 
 
   reelField.appendChild(
-    el("label",{text:"REEL TOPIC"})
+    el("label",{text:"Topic"})
   );
 
 
@@ -2223,7 +2465,7 @@ function renderMember(){
 
 
   payField.appendChild(
-    el("label",{text:"PAY (₹)"})
+    el("label",{text:"Payment (₹)"})
   );
 
 
@@ -2256,7 +2498,7 @@ function renderMember(){
 
 
   travelField.appendChild(
-    el("label",{text:"TRAVEL (₹)"})
+    el("label",{text:"Travel money (₹)"})
   );
 
 
@@ -2300,7 +2542,7 @@ function renderMember(){
 
   notesField.appendChild(
     el("label",{
-      text:"NOTES / DRIVE LINK"
+      text:"Notes or link"
     })
   );
 
@@ -2341,7 +2583,7 @@ function renderMember(){
       text:
         state.isLoading
           ? "Saving..."
-          : "Log this shoot",
+          : "Save this shoot",
 
       disabled:state.isLoading,
 
@@ -2383,7 +2625,7 @@ function renderMember(){
 
     el("div",{
       class:"section-title",
-      text:"YOUR RECENT LOGS"
+      text:"Your recent shoots"
     })
 
   );
@@ -2406,7 +2648,7 @@ function renderMember(){
         class:"empty",
 
         text:
-          "Nothing logged yet — fill the slate above once you shoot something."
+          "You haven't added anything yet. Use the form above after your shoot."
 
       })
 
@@ -2564,9 +2806,11 @@ function renderMember(){
 
   adminLink.appendChild(
 
-    el("a",{
+    el("button",{
 
-      text:"Admin dashboard →",
+      class:"btn-small",
+
+      text:"Team leader dashboard",
 
       onclick:()=>{
 
@@ -3379,7 +3623,7 @@ function renderAdmin(){
 
     el("h1",{
       text:
-        "TEAM KABIRA — ADMIN DASHBOARD"
+        "Team Kabira - Team Leader Dashboard"
     })
 
   );
@@ -3400,9 +3644,11 @@ function renderAdmin(){
 
   who.appendChild(
 
-    el("a",{
+    el("button",{
 
-      text:"exit",
+      class:"btn-small",
+
+      text:"Exit",
 
       onclick:()=>{
 
@@ -3425,6 +3671,8 @@ function renderAdmin(){
 
 
   lockup.appendChild(who);
+
+  lockup.appendChild(renderConnectionBadge());
 
   wrap.appendChild(lockup);
 
@@ -3470,10 +3718,10 @@ function renderAdmin(){
 
 
   [
-    [total,"Total logged"],
+    [total,"Total shoots"],
     [delivered,"Delivered"],
     [editing,"In editing"],
-    [uniqueBrands,"Brands shot"]
+    [uniqueBrands,"Brands worked with"]
   ].forEach(([number,label])=>{
 
     const stat =
@@ -3520,7 +3768,7 @@ function renderAdmin(){
 
       class:"secondary",
 
-      text:"📊 Export all to Excel",
+      text:"Download everything (Excel)",
 
       onclick:exportToExcel
 
@@ -3535,9 +3783,24 @@ function renderAdmin(){
 
       class:"ghost",
 
-      text:"🔄 Sync now",
+      text:"Save everything to the cloud",
 
       onclick:syncAllToFirebase
+
+    })
+
+  );
+
+
+  buttonGroup.appendChild(
+
+    el("button",{
+
+      class:"ghost",
+
+      text:"Check connection",
+
+      onclick:refreshConnectionStatus
 
     })
 
@@ -3561,6 +3824,26 @@ function renderAdmin(){
   }
 
 
+  if(
+    state.connectionStatus &&
+    state.connectionStatus.state === "bad"
+  ){
+
+    wrap.appendChild(
+
+      el("div",{
+        class:"msg err",
+        text:
+          "This app isn't saving to the shared cloud right now (" +
+          (state.connectionStatus.reason || "unknown error") +
+          "). Fix the Firebase Database Rules, then press \"Check connection\"."
+      })
+
+    );
+
+  }
+
+
   if(state.editingEntry){
 
     wrap.appendChild(renderEditEntryPanel());
@@ -3574,7 +3857,7 @@ function renderAdmin(){
 
     el("div",{
       class:"section-title",
-      text:"SEARCH MEMBER"
+      text:"Look up a person"
     })
 
   );
@@ -3594,7 +3877,7 @@ function renderAdmin(){
 
   const searchInput =
     el("input",{
-      placeholder:"Enter member name",
+      placeholder:"Type a name",
       value:state.searchMember
     });
 
@@ -3652,7 +3935,7 @@ function renderAdmin(){
           class:"empty",
 
           text:
-            "No records found for this member."
+            "No shoots found for that name."
 
         })
 
@@ -3771,7 +4054,7 @@ function renderAdmin(){
       details.appendChild(
 
         el("h3",{
-          text:"Shoot Records"
+          text:"Shoots"
         })
 
       );
@@ -3901,11 +4184,11 @@ function renderAdmin(){
 
         actionsCell.appendChild(
 
-          el("a",{
+          el("button",{
 
-            text:"✏️ Edit",
+            class:"btn-edit",
 
-            style:"cursor:pointer;color:var(--amber);margin-right:10px;",
+            text:"Edit",
 
             onclick:()=>{ openEditEntry(entry); }
 
@@ -3915,11 +4198,11 @@ function renderAdmin(){
 
         actionsCell.appendChild(
 
-          el("a",{
+          el("button",{
 
-            text:"🗑 Delete",
+            class:"btn-delete",
 
-            style:"cursor:pointer;color:var(--accent);",
+            text:"Delete",
 
             onclick:()=>{ deleteEntry(entry.id); }
 
@@ -3964,7 +4247,7 @@ function renderAdmin(){
 
     el("div",{
       class:"section-title",
-      text:"SHOOTS PER MEMBER"
+      text:"Shoots per person"
     })
 
   );
@@ -4020,7 +4303,7 @@ function renderAdmin(){
 
       el("div",{
         class:"empty",
-        text:"No members yet."
+        text:"No one has been added yet."
       })
 
     );
@@ -4086,17 +4369,16 @@ function renderAdmin(){
 
       row.appendChild(
 
-        el("a",{
+        el("button",{
 
-          text:"⬇",
+          class:"btn-icon",
+
+          text:"Download",
 
           title:
-            "Export " +
+            "Download " +
             name +
-            "'s shoots",
-
-          style:
-            "margin-left:8px;cursor:pointer;color:var(--ink-dim);font-family:'Space Mono',monospace;font-size:13px;",
+            "'s shoots as Excel",
 
           onclick:()=>{
 
@@ -4125,7 +4407,7 @@ function renderAdmin(){
 
     el("div",{
       class:"section-title",
-      text:"ALL LOGS TABLE"
+      text:"Everyone's shoots"
     })
 
   );
@@ -4187,7 +4469,7 @@ function renderAdmin(){
 
         colSpan:"11",
 
-        text:"No logs found",
+        text:"No shoots yet",
 
         style:
           "text-align:center;padding:20px;color:var(--ink-dim)"
@@ -4289,11 +4571,11 @@ function renderAdmin(){
 
       actionsCell.appendChild(
 
-        el("a",{
+        el("button",{
 
-          text:"✏️ Edit",
+          class:"btn-edit",
 
-          style:"cursor:pointer;color:var(--amber);margin-right:10px;",
+          text:"Edit",
 
           onclick:()=>{ openEditEntry(entry); }
 
@@ -4303,11 +4585,11 @@ function renderAdmin(){
 
       actionsCell.appendChild(
 
-        el("a",{
+        el("button",{
 
-          text:"🗑 Delete",
+          class:"btn-delete",
 
-          style:"cursor:pointer;color:var(--accent);",
+          text:"Delete",
 
           onclick:()=>{ deleteEntry(entry.id); }
 
@@ -4378,7 +4660,7 @@ function renderAdminGate(){
   body.appendChild(
 
     el("h2",{
-      text:"Admin Passcode"
+      text:"Team leader login"
     })
 
   );
@@ -4393,7 +4675,7 @@ function renderAdminGate(){
   passField.appendChild(
 
     el("label",{
-      text:"ENTER PASSCODE"
+      text:"Passcode"
     })
 
   );
@@ -4440,7 +4722,7 @@ function renderAdminGate(){
 
       class:"primary",
 
-      text:"Enter Admin",
+      text:"Enter",
 
       onclick:attemptAdminLogin
 
@@ -4537,7 +4819,7 @@ function render(){
         class:"wrap",
 
         style:
-          "text-align:center;padding-top:100px;color:var(--ink-dim);font-family:'Space Mono',monospace;font-size:13px;",
+          "text-align:center;padding-top:100px;color:var(--ink-dim);font-family:'Inter',sans-serif;font-size:13px;",
 
         html:
           '<div class="loading-spinner"></div><p>Connecting to Team Kabira...</p>'
@@ -4560,7 +4842,7 @@ function render(){
         class:"wrap",
 
         style:
-          "text-align:center;padding-top:100px;color:var(--accent);font-family:'Space Mono',monospace;font-size:13px;",
+          "text-align:center;padding-top:100px;color:var(--accent);font-family:'Inter',sans-serif;font-size:13px;",
 
         html:
           `
