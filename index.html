@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -767,6 +767,42 @@
       padding:9px;
     }
   }
+
+  /* ===== Showcasy-style form ===== */
+  .sc-form{max-width:680px;margin:0 auto;padding:28px 0 10px;}
+  .sc-title{font-size:clamp(40px,8vw,72px);line-height:.98;font-weight:700;letter-spacing:-0.045em;text-align:center;margin:0 0 18px;color:#0A0B14;}
+  .sc-title .dim{color:#A9ADB8;}
+  .sc-sub{text-align:center;color:#454A5C;font-size:17px;margin:0 0 44px;}
+  .sc-field{margin-bottom:34px;}
+  .sc-field>label,.sc-label{display:block;font-size:14px;font-weight:500;color:#0A0B14;margin-bottom:10px;}
+  .sc-field input,.sc-field textarea,.sc-field select{width:100%;border:none;border-bottom:1px solid #D5D8DF;border-radius:0;background:transparent;font-family:'Inter',sans-serif;font-size:15px;color:#0A0B14;padding:12px 12px 14px;outline:none;}
+  .sc-field input::placeholder,.sc-field textarea::placeholder{color:#8A8F9E;}
+  .sc-field input:focus,.sc-field textarea:focus{border-bottom-color:#0A0B14;outline:none;}
+  .sc-field textarea{min-height:110px;resize:vertical;}
+  .sc-row{display:grid;grid-template-columns:1fr 1fr;gap:28px;}
+  .sc-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:28px;}
+  @media(max-width:600px){.sc-row,.sc-row3{grid-template-columns:1fr;gap:0;}}
+  .sc-chips{display:flex;flex-wrap:wrap;gap:12px;}
+  .sc-chip{font-family:'Inter',sans-serif;font-size:14px;color:#0A0B14;background:#F6F7F9;border:1px solid #C9CCD5;border-radius:999px;padding:11px 18px;cursor:pointer;transition:all .15s;}
+  .sc-chip:hover{border-color:#0A0B14;}
+  .sc-chip.on{background:#D6D9E3;border-color:#0A0B14;}
+  .sc-drop{border:1.5px dashed #C9CCD5;border-radius:20px;padding:30px 20px;text-align:center;cursor:pointer;background:#F6F7F9;transition:all .15s;}
+  .sc-drop:hover,.sc-drop.over{border-color:#0A0B14;background:#ECEEF3;}
+  .sc-drop .ic{width:44px;height:44px;border-radius:50%;border:1px solid #C9CCD5;background:#fff;display:inline-flex;align-items:center;justify-content:center;margin-bottom:10px;}
+  .sc-drop .t{font-size:14px;font-weight:500;color:#0A0B14;}
+  .sc-drop .h{font-size:12.5px;color:#8A8F9E;margin-top:4px;}
+  .sc-preview{position:relative;display:inline-block;max-width:100%;}
+  .sc-preview img{display:block;max-width:100%;max-height:300px;border-radius:16px;border:1px solid #D5D8DF;}
+  .sc-preview button{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:50%;border:none;background:#0A0B14;color:#fff;font-size:16px;cursor:pointer;line-height:1;}
+  .sc-submit-row{display:flex;justify-content:flex-end;border-top:1px solid #D5D8DF;padding-top:34px;margin-top:6px;}
+  .sc-submit{display:inline-flex;align-items:center;gap:12px;background:#05060F;color:#fff;border:none;border-radius:999px;font-family:'Inter',sans-serif;font-size:17px;font-weight:500;padding:19px 34px;cursor:pointer;}
+  .sc-submit:hover{background:#1B1D2B;}
+  .sc-submit:disabled{opacity:.5;cursor:default;}
+  .sc-view{background:transparent;border:1px solid #C9CCD5;border-radius:999px;font-family:'Inter',sans-serif;font-size:12px;padding:5px 12px;cursor:pointer;color:#0A0B14;}
+  .sc-view:hover{border-color:#0A0B14;}
+  .sc-lightbox{position:fixed;inset:0;background:rgba(5,6,15,.88);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .sc-lightbox img{max-width:100%;max-height:100%;border-radius:12px;background:#fff;}
+  .sc-lightbox .x{position:absolute;top:18px;right:22px;color:#fff;font-size:30px;cursor:pointer;background:none;border:none;}
 </style>
 </head>
 
@@ -873,7 +909,9 @@ let state = {
 
     pay: "",
 
-    travel: ""
+    travel: "",
+
+    screenshot: ""
 
   },
 
@@ -1401,10 +1439,134 @@ function resetForm(){
 
     pay: "",
 
-    travel: ""
+    travel: "",
+
+    screenshot: ""
 
   };
 
+}
+
+
+/* ============================================================
+   SCREENSHOTS
+   Images are shrunk in the browser (max 1280px JPEG) and kept in
+   their own database node "screenshots/<entryId>" so the main
+   entries list stays light. Entries only carry hasScreenshot:true.
+   ============================================================ */
+
+const LS_SHOT_PREFIX = "tk_shot_";
+
+function compressImage(file){
+  return new Promise((resolve,reject)=>{
+    if(!file || !file.type.startsWith("image/")){
+      reject(new Error("Please choose an image file."));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = ()=>reject(new Error("Could not read that file."));
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onerror = ()=>reject(new Error("That image could not be opened."));
+      img.onload = ()=>{
+        const MAX = 1280;
+        let w = img.width, h = img.height;
+        if(Math.max(w,h) > MAX){
+          const k = MAX / Math.max(w,h);
+          w = Math.round(w*k); h = Math.round(h*k);
+        }
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const ctx = c.getContext("2d");
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0,0,w,h);
+        ctx.drawImage(img,0,0,w,h);
+        resolve(c.toDataURL("image/jpeg",0.78));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleScreenshotFile(file){
+  try{
+    state.form.screenshot = await compressImage(file);
+    state.formMsg = null;
+  }catch(err){
+    state.formMsg = { type:"err", text: err.message };
+  }
+  render();
+}
+
+async function saveScreenshot(id,dataUrl){
+  try{ localStorage.setItem(LS_SHOT_PREFIX+id,dataUrl); }catch(e){}
+  if(!db) throw new Error("Firebase database is unavailable.");
+  await db.ref("screenshots/"+id).set(dataUrl);
+}
+
+async function loadScreenshot(id){
+  try{
+    if(db){
+      const snap = await db.ref("screenshots/"+id).once("value");
+      if(snap.exists()) return snap.val();
+    }
+  }catch(e){ console.error("Screenshot load failed:",e); }
+  try{ return localStorage.getItem(LS_SHOT_PREFIX+id); }catch(e){ return null; }
+}
+
+async function viewScreenshot(id){
+  const box = document.createElement("div");
+  box.className = "sc-lightbox";
+  box.innerHTML = '<button class="x" aria-label="Close">×</button><div class="loading-spinner" style="border-top-color:#fff"></div>';
+  box.onclick = ()=>box.remove();
+  document.body.appendChild(box);
+  const data = await loadScreenshot(id);
+  if(!box.isConnected) return;
+  if(!data){
+    box.innerHTML = '<button class="x">×</button><div style="color:#fff;font-size:14px">Screenshot not available.</div>';
+    return;
+  }
+  box.innerHTML = '<button class="x">×</button>';
+  const img = document.createElement("img");
+  img.src = data;
+  img.onclick = e=>e.stopPropagation();
+  box.appendChild(img);
+}
+
+const shotCache = {};
+
+function adminShotCell(entry){
+  const td = el("td");
+  if(!entry.hasScreenshot){ td.textContent = "-"; return td; }
+  const thumb = el("div",{
+    style:"width:56px;height:56px;border-radius:10px;border:1px solid var(--rule);background:var(--panel-alt);overflow:hidden;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ink-dim);",
+    title:"Click to enlarge",
+    text:"…",
+    onclick:()=>viewScreenshot(entry.id)
+  });
+  const show = data=>{
+    thumb.textContent = "";
+    if(!data){ thumb.textContent = "n/a"; return; }
+    const img = el("img",{src:data,alt:"Screenshot",style:"width:100%;height:100%;object-fit:cover;display:block;"});
+    thumb.appendChild(img);
+  };
+  if(shotCache[entry.id] !== undefined){ show(shotCache[entry.id]); }
+  else{
+    loadScreenshot(entry.id).then(d=>{ shotCache[entry.id] = d; show(d); });
+  }
+  td.appendChild(thumb);
+  return td;
+}
+
+function screenshotCell(entry){
+  const td = el("td");
+  if(entry.hasScreenshot){
+    td.appendChild(el("button",{class:"sc-view",text:"View",onclick:()=>viewScreenshot(entry.id)}));
+  }else{
+    td.textContent = "-";
+  }
+  return td;
 }
 
 
@@ -1479,9 +1641,13 @@ async function submitEntry(){
 
     travel: state.form.travel
       ? parseFloat(state.form.travel)
-      : 0
+      : 0,
+
+    hasScreenshot: !!state.form.screenshot
 
   };
+
+  const shotData = state.form.screenshot;
 
 
   state.entries.unshift(entry);
@@ -1493,6 +1659,10 @@ async function submitEntry(){
 
 
   try{
+
+    if(shotData){
+      await saveScreenshot(entry.id, shotData);
+    }
 
     await saveEntries();
 
@@ -1621,11 +1791,16 @@ function el(tag,attrs={}){
     elem.title = attrs.title;
 
 
+  if(attrs.class !== undefined)
+    elem.className = attrs.class;
+
+
   delete attrs.text;
   delete attrs.html;
   delete attrs.onclick;
   delete attrs.style;
   delete attrs.title;
+  delete attrs.class;
 
 
   Object.assign(elem,attrs);
@@ -2136,488 +2311,153 @@ function renderMember(){
   wrap.appendChild(lockup);
 
 
-  /* FORM */
+  /* FORM — showcasy style */
 
-  const slate =
-    el("div",{class:"slate"});
+  const form = el("div",{class:"sc-form"});
 
+  const title = el("h2",{class:"sc-title"});
+  title.innerHTML = '<span class="dim">Log it!</span> and tell us about today\'s shoot';
+  form.appendChild(title);
 
-  slate.appendChild(
-    el("div",{class:"slate-stripe"})
-  );
+  form.appendChild(el("p",{class:"sc-sub",text:"Add the details, attach a screenshot of the work and save."}));
 
+  const bind = (input,key)=>{
+    input.addEventListener("input",e=>{ state.form[key] = e.target.value; });
+    return input;
+  };
 
-  const body =
-    el("div",{class:"slate-body"});
+  const field = (labelText,input)=>{
+    const f = el("div",{class:"sc-field"});
+    f.appendChild(el("label",{text:labelText}));
+    f.appendChild(input);
+    return f;
+  };
 
-
-  body.appendChild(
-    el("h2",{text:"Step 2: Add today's shoot"})
-  );
-
-
-  /* BRAND + CONTENT */
-
-  const row2a =
-    el("div",{class:"row2"});
-
-
-  const brandField =
-    el("div",{class:"field"});
-
-
-  brandField.appendChild(
-    el("label",{text:"Brand"})
-  );
-
-
-  const brandInput =
-    el("input",{
-      placeholder:"e.g. Nike",
-      value:state.form.brand
+  const chips = (labelText,options,key)=>{
+    const f = el("div",{class:"sc-field"});
+    f.appendChild(el("span",{class:"sc-label",text:labelText}));
+    const row = el("div",{class:"sc-chips"});
+    options.forEach(opt=>{
+      row.appendChild(el("button",{
+        type:"button",
+        class:"sc-chip" + (state.form[key] === opt ? " on" : ""),
+        text:opt,
+        onclick:()=>{
+          state.form[key] = opt;
+          [...row.children].forEach(c=>c.classList.toggle("on", c.textContent === opt));
+        }
+      }));
     });
+    f.appendChild(row);
+    return f;
+  };
 
+  /* Brand */
+  form.appendChild(field("Brand*", bind(el("input",{placeholder:"e.g. Nike",value:state.form.brand}),"brand")));
 
-  brandInput.addEventListener(
-    "input",
-    e=>{
-      state.form.brand =
-        e.target.value;
-    }
-  );
+  /* Content type chips */
+  form.appendChild(chips("Type of content*",CONTENT_TYPES,"contentType"));
 
+  /* Status chips */
+  form.appendChild(chips("Status*",STATUSES,"status"));
 
-  brandField.appendChild(brandInput);
+  /* Date + Location */
+  const rowDL = el("div",{class:"sc-row"});
+  rowDL.appendChild(field("Date", bind(el("input",{type:"date",value:state.form.date}),"date")));
+  rowDL.appendChild(field("Location", bind(el("input",{placeholder:"e.g. Karjat farmhouse",value:state.form.location}),"location")));
+  form.appendChild(rowDL);
 
-  row2a.appendChild(brandField);
+  /* Approved / Coordinator / Topic */
+  const row3 = el("div",{class:"sc-row3"});
+  row3.appendChild(field("Approved by", bind(el("input",{placeholder:"Client name",value:state.form.approvedBy}),"approvedBy")));
+  row3.appendChild(field("Coordinator", bind(el("input",{placeholder:"Person name",value:state.form.coordinator}),"coordinator")));
+  row3.appendChild(field("Topic", bind(el("input",{placeholder:"Product launch",value:state.form.reelTopic}),"reelTopic")));
+  form.appendChild(row3);
 
+  /* Pay + Travel */
+  const rowPT = el("div",{class:"sc-row"});
+  rowPT.appendChild(field("Payment (₹)", bind(el("input",{type:"number",min:"0",step:"0.01",placeholder:"0",value:state.form.pay}),"pay")));
+  rowPT.appendChild(field("Travel money (₹)", bind(el("input",{type:"number",min:"0",step:"0.01",placeholder:"0",value:state.form.travel}),"travel")));
+  form.appendChild(rowPT);
 
-  const typeField =
-    el("div",{class:"field"});
+  /* SCREENSHOT UPLOAD */
+  const shotField = el("div",{class:"sc-field"});
+  shotField.appendChild(el("span",{class:"sc-label",text:"Screenshot of the work"}));
 
-
-  typeField.appendChild(
-    el("label",{text:"Type of content"})
-  );
-
-
-  const typeSelect =
-    el("select",{});
-
-
-  CONTENT_TYPES.forEach(type=>{
-
-    typeSelect.appendChild(
-
-      el("option",{
-        value:type,
-        text:type
-      })
-
-    );
-
+  const fileInput = el("input",{type:"file",accept:"image/*",style:"display:none"});
+  fileInput.addEventListener("change",e=>{
+    const f = e.target.files && e.target.files[0];
+    if(f) handleScreenshotFile(f);
   });
+  shotField.appendChild(fileInput);
 
-
-  typeSelect.value =
-    state.form.contentType;
-
-
-  typeSelect.addEventListener(
-    "change",
-    e=>{
-      state.form.contentType =
-        e.target.value;
-    }
-  );
-
-
-  typeField.appendChild(typeSelect);
-
-  row2a.appendChild(typeField);
-
-  body.appendChild(row2a);
-
-
-  /* DATE + STATUS */
-
-  const row2b =
-    el("div",{class:"row2"});
-
-
-  const dateField =
-    el("div",{class:"field"});
-
-
-  dateField.appendChild(
-    el("label",{text:"Date"})
-  );
-
-
-  const dateInput =
-    el("input",{
-      type:"date",
-      value:state.form.date
+  if(state.form.screenshot){
+    const prev = el("div",{class:"sc-preview"});
+    prev.appendChild(el("img",{src:state.form.screenshot,alt:"Screenshot preview"}));
+    prev.appendChild(el("button",{
+      type:"button",
+      title:"Remove screenshot",
+      text:"×",
+      onclick:()=>{ state.form.screenshot = ""; render(); }
+    }));
+    shotField.appendChild(prev);
+  }else{
+    const drop = el("div",{class:"sc-drop"});
+    drop.innerHTML =
+      '<div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0A0B14" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4l-4.5 4.5M12 4l4.5 4.5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></div>' +
+      '<div class="t">Click to upload, drag &amp; drop, or paste</div>' +
+      '<div class="h">PNG, JPG or WEBP — resized automatically</div>';
+    drop.onclick = ()=>fileInput.click();
+    drop.addEventListener("dragover",e=>{ e.preventDefault(); drop.classList.add("over"); });
+    drop.addEventListener("dragleave",()=>drop.classList.remove("over"));
+    drop.addEventListener("drop",e=>{
+      e.preventDefault();
+      drop.classList.remove("over");
+      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if(f) handleScreenshotFile(f);
     });
+    shotField.appendChild(drop);
+  }
+  form.appendChild(shotField);
 
+  /* Notes */
+  const notesInput = el("textarea",{placeholder:"Anything the team should know, or a link..."});
+  notesInput.value = state.form.notes;
+  bind(notesInput,"notes");
+  form.appendChild(field("Notes or link", notesInput));
 
-  dateInput.addEventListener(
-    "input",
-    e=>{
-      state.form.date =
-        e.target.value;
-    }
-  );
-
-
-  dateField.appendChild(dateInput);
-
-  row2b.appendChild(dateField);
-
-
-  const statusField =
-    el("div",{class:"field"});
-
-
-  statusField.appendChild(
-    el("label",{text:"Status"})
-  );
-
-
-  const statusSelect =
-    el("select",{});
-
-
-  STATUSES.forEach(status=>{
-
-    statusSelect.appendChild(
-
-      el("option",{
-        value:status,
-        text:status
-      })
-
-    );
-
+  /* Submit */
+  const submitRow = el("div",{class:"sc-submit-row"});
+  const submitBtn = el("button",{
+    class:"sc-submit",
+    disabled:state.isLoading,
+    onclick:submitEntry
   });
-
-
-  statusSelect.value =
-    state.form.status;
-
-
-  statusSelect.addEventListener(
-    "change",
-    e=>{
-      state.form.status =
-        e.target.value;
-    }
-  );
-
-
-  statusField.appendChild(statusSelect);
-
-  row2b.appendChild(statusField);
-
-  body.appendChild(row2b);
-
-
-  /* LOCATION */
-
-  const locField =
-    el("div",{class:"field"});
-
-
-  locField.appendChild(
-    el("label",{text:"Location"})
-  );
-
-
-  const locInput =
-    el("input",{
-      placeholder:"e.g. Karjat farmhouse",
-      value:state.form.location
-    });
-
-
-  locInput.addEventListener(
-    "input",
-    e=>{
-      state.form.location =
-        e.target.value;
-    }
-  );
-
-
-  locField.appendChild(locInput);
-
-  body.appendChild(locField);
-
-
-  /* APPROVED / COORDINATOR / TOPIC */
-
-  const row3 =
-    el("div",{class:"row3"});
-
-
-  const approvedField =
-    el("div",{class:"field"});
-
-
-  approvedField.appendChild(
-    el("label",{text:"Approved by"})
-  );
-
-
-  const approvedInput =
-    el("input",{
-      placeholder:"e.g. Client Name",
-      value:state.form.approvedBy
-    });
-
-
-  approvedInput.addEventListener(
-    "input",
-    e=>{
-      state.form.approvedBy =
-        e.target.value;
-    }
-  );
-
-
-  approvedField.appendChild(approvedInput);
-
-  row3.appendChild(approvedField);
-
-
-  const coordinatorField =
-    el("div",{class:"field"});
-
-
-  coordinatorField.appendChild(
-    el("label",{text:"Coordinator"})
-  );
-
-
-  const coordinatorInput =
-    el("input",{
-      placeholder:"e.g. Person Name",
-      value:state.form.coordinator
-    });
-
-
-  coordinatorInput.addEventListener(
-    "input",
-    e=>{
-      state.form.coordinator =
-        e.target.value;
-    }
-  );
-
-
-  coordinatorField.appendChild(
-    coordinatorInput
-  );
-
-  row3.appendChild(coordinatorField);
-
-
-  const reelField =
-    el("div",{class:"field"});
-
-
-  reelField.appendChild(
-    el("label",{text:"Topic"})
-  );
-
-
-  const reelInput =
-    el("input",{
-      placeholder:"e.g. Product Launch",
-      value:state.form.reelTopic
-    });
-
-
-  reelInput.addEventListener(
-    "input",
-    e=>{
-      state.form.reelTopic =
-        e.target.value;
-    }
-  );
-
-
-  reelField.appendChild(reelInput);
-
-  row3.appendChild(reelField);
-
-  body.appendChild(row3);
-
-
-  /* PAY + TRAVEL */
-
-  const row3b =
-    el("div",{class:"row3"});
-
-
-  const payField =
-    el("div",{class:"field"});
-
-
-  payField.appendChild(
-    el("label",{text:"Payment (₹)"})
-  );
-
-
-  const payInput =
-    el("input",{
-      type:"number",
-      min:"0",
-      step:"0.01",
-      placeholder:"0",
-      value:state.form.pay
-    });
-
-
-  payInput.addEventListener(
-    "input",
-    e=>{
-      state.form.pay =
-        e.target.value;
-    }
-  );
-
-
-  payField.appendChild(payInput);
-
-  row3b.appendChild(payField);
-
-
-  const travelField =
-    el("div",{class:"field"});
-
-
-  travelField.appendChild(
-    el("label",{text:"Travel money (₹)"})
-  );
-
-
-  const travelInput =
-    el("input",{
-      type:"number",
-      min:"0",
-      step:"0.01",
-      placeholder:"0",
-      value:state.form.travel
-    });
-
-
-  travelInput.addEventListener(
-    "input",
-    e=>{
-      state.form.travel =
-        e.target.value;
-    }
-  );
-
-
-  travelField.appendChild(travelInput);
-
-  row3b.appendChild(travelField);
-
-
-  row3b.appendChild(
-    el("div",{class:"field"})
-  );
-
-
-  body.appendChild(row3b);
-
-
-  /* NOTES */
-
-  const notesField =
-    el("div",{class:"field"});
-
-
-  notesField.appendChild(
-    el("label",{
-      text:"Notes or link"
-    })
-  );
-
-
-  const notesInput =
-    el("textarea",{
-      placeholder:
-        "Anything the team should know..."
-    });
-
-
-  notesInput.value =
-    state.form.notes;
-
-
-  notesInput.addEventListener(
-    "input",
-    e=>{
-      state.form.notes =
-        e.target.value;
-    }
-  );
-
-
-  notesField.appendChild(notesInput);
-
-  body.appendChild(notesField);
-
-
-  /* SUBMIT */
-
-  body.appendChild(
-
-    el("button",{
-
-      class:"primary",
-
-      text:
-        state.isLoading
-          ? "Saving..."
-          : "Save this shoot",
-
-      disabled:state.isLoading,
-
-      onclick:submitEntry
-
-    })
-
-  );
-
+  submitBtn.innerHTML =
+    (state.isLoading ? "Saving..." : "Submit") +
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M14 6l6 6-6 6"/></svg>';
+  submitRow.appendChild(submitBtn);
+  form.appendChild(submitRow);
 
   if(state.formMsg){
-
-    body.appendChild(
-
-      el("div",{
-
-        class:
-          "msg " +
-          state.formMsg.type,
-
-        text:
-          state.formMsg.text
-
-      })
-
-    );
-
+    form.appendChild(el("div",{
+      class:"msg " + state.formMsg.type,
+      style:"text-align:right;font-size:13px;",
+      text:state.formMsg.text
+    }));
   }
 
+  wrap.appendChild(form);
 
-  slate.appendChild(body);
-
-  wrap.appendChild(slate);
-
+  /* Paste a screenshot straight from the clipboard */
+  if(!window.__scPasteBound){
+    window.__scPasteBound = true;
+    document.addEventListener("paste",e=>{
+      if(state.view !== "member" || !e.clipboardData) return;
+      const item = [...e.clipboardData.items].find(i=>i.type.startsWith("image/"));
+      if(item){ handleScreenshotFile(item.getAsFile()); }
+    });
+  }
 
   /* RECENT LOGS */
 
@@ -2679,7 +2519,8 @@ function renderMember(){
       "Coordinator",
       "Pay",
       "Travel",
-      "Status"
+      "Status",
+      "Screenshot"
     ].forEach(header=>{
 
       headerRow.appendChild(
@@ -2774,6 +2615,8 @@ function renderMember(){
         })
       );
 
+
+      row.appendChild(screenshotCell(entry));
 
       tbody.appendChild(row);
 
@@ -3304,6 +3147,9 @@ async function deleteEntry(id){
 
   cacheEntries();
 
+  try{ localStorage.removeItem(LS_SHOT_PREFIX+id); }catch(e){}
+  if(db){ db.ref("screenshots/"+id).remove().catch(()=>{}); }
+
 
   if(
     state.editingEntry &&
@@ -3523,6 +3369,34 @@ function renderEditEntryPanel(){
   notesInput.addEventListener("input", e=>{ ee.notes = e.target.value; });
 
   body.appendChild(editField("notes","NOTES / DRIVE LINK",notesInput));
+
+  /* SCREENSHOT PREVIEW */
+
+  const editEntry = state.entries.find(x=>x.id === ee.id);
+
+  if(editEntry && editEntry.hasScreenshot){
+
+    const shotWrap = el("div",{class:"field"});
+
+    shotWrap.appendChild(el("label",{text:"UPLOADED SCREENSHOT"}));
+
+    const shotBox = el("div",{
+      style:"display:inline-block;max-width:100%;cursor:pointer;",
+      text:"Loading...",
+      onclick:()=>viewScreenshot(ee.id)
+    });
+
+    shotWrap.appendChild(shotBox);
+
+    loadScreenshot(ee.id).then(d=>{
+      shotBox.textContent = "";
+      if(!d){ shotBox.textContent = "Screenshot not available."; return; }
+      shotBox.appendChild(el("img",{src:d,alt:"Screenshot",style:"max-width:100%;max-height:260px;border-radius:12px;border:1px solid var(--rule);display:block;"}));
+    });
+
+    body.appendChild(shotWrap);
+
+  }
 
 
   /* ACTIONS */
@@ -4084,6 +3958,7 @@ function renderAdmin(){
         "Pay",
         "Travel",
         "Status",
+        "Screenshot",
         "Actions"
       ].forEach(header=>{
 
@@ -4180,7 +4055,8 @@ function renderAdmin(){
         );
 
 
-        const actionsCell = el("td",{});
+        row.appendChild(adminShotCell(entry));
+      const actionsCell = el("td",{});
 
         actionsCell.appendChild(
 
@@ -4438,6 +4314,7 @@ function renderAdmin(){
     "Pay",
     "Travel",
     "Status",
+    "Screenshot",
     "Actions"
   ].forEach(header=>{
 
@@ -4467,7 +4344,7 @@ function renderAdmin(){
 
       el("td",{
 
-        colSpan:"11",
+        colSpan:"12",
 
         text:"No shoots yet",
 
@@ -4567,6 +4444,7 @@ function renderAdmin(){
       );
 
 
+      row.appendChild(adminShotCell(entry));
       const actionsCell = el("td",{});
 
       actionsCell.appendChild(
