@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -821,6 +821,8 @@ const ADMIN_PASSCODE = "KABIRA2026";
 const CONTENT_TYPES = [
   "Reel",
   "Story",
+  "Post",
+  "Carousel",
   "BTS",
   "Full Shoot",
   "Photoshoot",
@@ -832,6 +834,17 @@ const STATUSES = [
   "Editing",
   "Delivered"
 ];
+
+/* Content types that can be given a DAILY posting target
+   in a brand's content calendar (admin panel). */
+const POST_TYPES = [
+  "Reel",
+  "Story",
+  "Post",
+  "Carousel"
+];
+
+const DAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
 
 /* ============================================================
@@ -882,6 +895,30 @@ let state = {
   currentUser: null,
 
   members: [],
+
+  brands: [],
+
+  brandForm: null,
+
+  brandMsg: null,
+
+  peopleMsg: null,
+
+  calMsg: null,
+
+  brandsDirty: false,
+
+  messages: [],
+
+  msgForm: { to:"", text:"" },
+
+  msgNotice: null,
+
+  calBrandId: null,
+
+  calMonth: null,
+
+  calDay: null,
 
   entries: [],
 
@@ -951,6 +988,8 @@ function todayISO(){
 }
 
 state.form.date = todayISO();
+
+state.brandForm = newBrandForm();
 
 
 /* ============================================================
@@ -1041,6 +1080,83 @@ function loadCachedMembers(){
    know for certain whether syncing is really working, and shows
    it in the UI instead of hiding it in the console.
    ============================================================ */
+
+const LS_BRANDS_KEY = "tk_cache_brands";
+
+function cacheBrands(){
+
+  try{
+
+    localStorage.setItem(
+      LS_BRANDS_KEY,
+      JSON.stringify(state.brands)
+    );
+
+  }catch(error){
+
+    console.error("Could not cache brands locally:", error);
+
+  }
+
+}
+
+function loadCachedBrands(){
+
+  try{
+
+    const raw = localStorage.getItem(LS_BRANDS_KEY);
+
+    return raw ? JSON.parse(raw) : [];
+
+  }catch(error){
+
+    return [];
+
+  }
+
+}
+
+async function saveBrands(){
+
+  cacheBrands();
+
+  if(!db){
+
+    throw new Error("Firebase database is unavailable.");
+
+  }
+
+  const brandsObj = {};
+
+  state.brands.forEach(brand=>{
+
+    brandsObj[brand.id] = brand;
+
+  });
+
+  /* _meta keeps the node alive even when the last brand is
+     deleted, so other devices see "empty" instead of reviving
+     their stale cached copy. */
+
+  brandsObj._meta = { saved: Date.now() };
+
+  try{
+
+    await db.ref("brands").set(brandsObj);
+
+  }catch(error){
+
+    state.brandsDirty = true;
+
+    throw error;
+
+  }
+
+  state.brandsDirty = false;
+
+  return true;
+
+}
 
 async function testFirebaseConnection(){
 
@@ -1142,7 +1258,12 @@ async function loadAll(){
     if(membersData){
 
       state.members =
-        Object.values(membersData);
+        Object.entries(membersData)
+          .filter(([key,value])=>
+            key !== "_meta" &&
+            typeof value === "string"
+          )
+          .map(([key,value])=>value);
 
       cacheMembers();
 
@@ -1186,6 +1307,55 @@ async function loadAll(){
   }
 
 
+  let brandsSynced = false;
+
+  state.brands = loadCachedBrands();
+
+  try{
+
+    const brandsSnap =
+      await db.ref("brands").once("value");
+
+    const brandsData = brandsSnap.val();
+
+    if(brandsData){
+
+      state.brands =
+        Object.entries(brandsData)
+          .filter(([key,value])=>
+            key !== "_meta" &&
+            value &&
+            typeof value === "object"
+          )
+          .map(([key,value])=>value);
+
+      cacheBrands();
+
+      brandsSynced = true;
+
+    }
+
+  }catch(error){
+
+    console.error("Load brands failed (keeping local cache):", error);
+
+  }
+
+  state.brands.sort(
+    (a,b)=>String(a.name||"").localeCompare(String(b.name||""))
+  );
+
+  if(state.brands.length && !brandsSynced){
+
+    saveBrands().catch(error=>{
+      console.error("Re-sync of cached brands failed:", error);
+    });
+
+  }
+
+
+  await loadMessages();
+
   state.entries.sort(
     (a,b) =>
       new Date(b.date || 0) -
@@ -1217,7 +1387,15 @@ async function loadAll(){
     localStorage.getItem("currentUser");
 
 
-  if(savedUser){
+  if(savedUser && !state.members.includes(savedUser)){
+
+    /* This person was deleted by the admin (or never existed). */
+
+    localStorage.removeItem("currentUser");
+
+  }
+
+  if(savedUser && state.members.includes(savedUser)){
 
     state.currentUser = savedUser;
 
@@ -1269,6 +1447,11 @@ async function saveMembers(){
       membersObj[index] = member;
 
     });
+
+    /* _meta lets the node survive even if every person is
+       deleted, so other devices don't revive old cached names. */
+
+    membersObj._meta = { saved: Date.now() };
 
     await db.ref("members").set(membersObj);
 
@@ -1347,6 +1530,8 @@ async function syncAllToFirebase(){
   let membersOk = true;
   let entriesOk = true;
 
+  let brandsOk = true;
+
 
   try{
     await saveMembers();
@@ -1360,8 +1545,14 @@ async function syncAllToFirebase(){
     entriesOk = false;
   }
 
+  try{
+    await saveBrands();
+  }catch(error){
+    brandsOk = false;
+  }
 
-  if(membersOk && entriesOk){
+
+  if(membersOk && entriesOk && brandsOk){
 
     state.syncMsg = {
       type:"ok",
@@ -2311,6 +2502,10 @@ function renderMember(){
   wrap.appendChild(lockup);
 
 
+  /* MESSAGES FROM ADMIN */
+
+  wrap.appendChild(renderMemberMessages());
+
   /* FORM — showcasy style */
 
   const form = el("div",{class:"sc-form"});
@@ -2353,7 +2548,52 @@ function renderMember(){
   };
 
   /* Brand */
-  form.appendChild(field("Brand*", bind(el("input",{placeholder:"e.g. Nike",value:state.form.brand}),"brand")));
+  /* Brand dropdown — only brands created by the admin */
+  if(state.form.brand && !state.brands.some(b=>b.name === state.form.brand)){
+    state.form.brand = "";
+  }
+
+  const brandSelect = el("select",{});
+  brandSelect.appendChild(el("option",{
+    value:"",
+    text: state.brands.length ? "Select a brand..." : "No brands available yet"
+  }));
+  state.brands.forEach(b=>{
+    brandSelect.appendChild(el("option",{ value:b.name, text:b.name }));
+  });
+  brandSelect.value = state.form.brand;
+  brandSelect.disabled = !state.brands.length;
+
+  const brandHint = el("div",{
+    class:"msg info",
+    style:"margin:6px 0 0;font-size:12.5px;"
+  });
+
+  const updateBrandHint = ()=>{
+    const chosen = state.brands.find(b=>b.name === state.form.brand);
+    if(chosen){
+      brandHint.textContent =
+        "Content calendar: " + brandDailyText(chosen) +
+        " \u00b7 " + brandDaysText(chosen) +
+        (chosen.notes ? " \u00b7 " + chosen.notes : "");
+    }else if(!state.brands.length){
+      brandHint.textContent =
+        "Ask the team leader to add brands in the admin panel.";
+    }else{
+      brandHint.textContent = "";
+    }
+  };
+
+  brandSelect.addEventListener("change",e=>{
+    state.form.brand = e.target.value;
+    updateBrandHint();
+  });
+
+  updateBrandHint();
+
+  const brandField = field("Brand*", brandSelect);
+  brandField.appendChild(brandHint);
+  form.appendChild(brandField);
 
   /* Content type chips */
   form.appendChild(chips("Type of content*",CONTENT_TYPES,"contentType"));
@@ -3223,12 +3463,25 @@ function renderEditEntryPanel(){
   row2a.appendChild(editField("member","MEMBER",memberInput));
 
 
-  const brandInput = el("input",{
-    placeholder:"e.g. Nike",
-    value:ee.brand
+  const brandInput = el("select",{});
+
+  brandInput.appendChild(el("option",{ value:"", text:"Select a brand..." }));
+
+  const knownBrandNames = state.brands.map(b=>b.name);
+
+  /* keep an older free-typed brand selectable so editing an old
+     entry never silently changes its brand */
+  if(ee.brand && !knownBrandNames.includes(ee.brand)){
+    brandInput.appendChild(el("option",{ value:ee.brand, text:ee.brand + " (not in brand list)" }));
+  }
+
+  state.brands.forEach(b=>{
+    brandInput.appendChild(el("option",{ value:b.name, text:b.name }));
   });
 
-  brandInput.addEventListener("input", e=>{ ee.brand = e.target.value; });
+  brandInput.value = ee.brand;
+
+  brandInput.addEventListener("change", e=>{ ee.brand = e.target.value; });
 
   row2a.appendChild(editField("brand","BRAND",brandInput));
 
@@ -3469,6 +3722,1782 @@ function renderEditEntryPanel(){
 
 
   return slate;
+
+}
+
+
+/* ============================================================
+   BRANDS + CONTENT CALENDAR (admin)
+   ============================================================ */
+
+function newBrandForm(){
+
+  const counts = {};
+
+  POST_TYPES.forEach(type=>{ counts[type] = 0; });
+
+  return {
+    id:null,
+    name:"",
+    counts,
+    days:[0,1,2,3,4,5,6],
+    notes:""
+  };
+
+}
+
+function normName(value){
+
+  return String(value || "").trim().toLowerCase();
+
+}
+
+function brandCounts(brand){
+
+  const counts = {};
+
+  POST_TYPES.forEach(type=>{
+    counts[type] = Number((brand.counts || {})[type]) || 0;
+  });
+
+  return counts;
+
+}
+
+function brandDays(brand){
+
+  const raw = brand.days || [];
+
+  return (Array.isArray(raw) ? raw : Object.values(raw))
+    .map(Number)
+    .filter(n=>n >= 0 && n <= 6);
+
+}
+
+function pluralType(type,n){
+
+  if(n === 1) return type;
+
+  return type === "Story" ? "Stories" : type + "s";
+
+}
+
+function brandDailyText(brand){
+
+  const counts = brandCounts(brand);
+
+  const parts =
+    POST_TYPES
+      .filter(type=>counts[type] > 0)
+      .map(type=>counts[type] + " " + pluralType(type,counts[type]));
+
+  return parts.length
+    ? parts.join(" + ") + " / day"
+    : "No daily target set";
+
+}
+
+function brandDaysText(brand){
+
+  const days = brandDays(brand).sort((a,b)=>a-b);
+
+  if(days.length === 7) return "Every day";
+
+  if(!days.length) return "No days selected";
+
+  return days.map(i=>DAY_NAMES[i]).join(", ");
+
+}
+
+function brandWeeklyTotal(brand){
+
+  const counts = brandCounts(brand);
+
+  const perDay =
+    Object.values(counts).reduce((sum,n)=>sum + n,0);
+
+  return perDay * brandDays(brand).length;
+
+}
+
+function flashMsg(key,msg,ms){
+
+  state[key] = msg;
+
+  render();
+
+  setTimeout(()=>{
+
+    state[key] = null;
+
+    render();
+
+  }, ms || 3500);
+
+}
+
+async function submitBrandForm(){
+
+  const f = state.brandForm;
+
+  const name = f.name.trim();
+
+  if(!name){
+
+    state.brandMsg = { type:"err", text:"Enter a brand name." };
+
+    render();
+
+    return;
+
+  }
+
+  if(state.brands.some(b=>normName(b.name) === normName(name) && b.id !== f.id)){
+
+    state.brandMsg = { type:"err", text:"A brand with that name already exists." };
+
+    render();
+
+    return;
+
+  }
+
+  const counts = {};
+
+  POST_TYPES.forEach(type=>{
+
+    const n = Math.floor(Number(f.counts[type])) || 0;
+
+    counts[type] = Math.max(0, Math.min(50, n));
+
+  });
+
+  if(Object.values(counts).every(n=>n === 0)){
+
+    state.brandMsg = {
+      type:"err",
+      text:"Set at least one daily target (for example 2 Reels)."
+    };
+
+    render();
+
+    return;
+
+  }
+
+  if(!f.days.length){
+
+    state.brandMsg = { type:"err", text:"Pick at least one posting day." };
+
+    render();
+
+    return;
+
+  }
+
+  const wasEditing = !!f.id;
+
+  const data = {
+    id: f.id || Date.now().toString(),
+    name,
+    counts,
+    days: f.days.slice().sort((a,b)=>a-b),
+    notes: f.notes.trim()
+  };
+
+  const existingBrand = state.brands.find(b=>b.id === f.id);
+
+  if(existingBrand && existingBrand.manual){ data.manual = existingBrand.manual; }
+
+  if(existingBrand && existingBrand.overrides){ data.overrides = existingBrand.overrides; }
+
+  if(wasEditing){
+
+    const index = state.brands.findIndex(b=>b.id === f.id);
+
+    if(index >= 0){ state.brands[index] = data; }
+    else{ state.brands.push(data); }
+
+  }else{
+
+    state.brands.push(data);
+
+  }
+
+  state.brands.sort(
+    (a,b)=>String(a.name||"").localeCompare(String(b.name||""))
+  );
+
+  state.brandForm = newBrandForm();
+
+  cacheBrands();
+
+  let msg;
+
+  try{
+
+    await saveBrands();
+
+    msg = {
+      type:"ok",
+      text: wasEditing
+        ? "\u2713 " + name + " updated."
+        : "\u2713 " + name + " added. It now appears in the members' brand dropdown."
+    };
+
+  }catch(error){
+
+    console.error(error);
+
+    msg = {
+      type:"info",
+      text:"\u26a0 Saved on this device, but couldn't sync to Firebase yet (check Firebase Rules)."
+    };
+
+  }
+
+  flashMsg("brandMsg",msg);
+
+}
+
+function startEditBrand(brand){
+
+  state.brandForm = {
+    id: brand.id,
+    name: brand.name,
+    counts: brandCounts(brand),
+    days: brandDays(brand),
+    notes: brand.notes || ""
+  };
+
+  state.brandMsg = null;
+
+  render();
+
+  const target = document.getElementById("brand-form");
+
+  if(target){ target.scrollIntoView({ behavior:"smooth", block:"start" }); }
+
+}
+
+async function deleteBrand(brand){
+
+  if(!confirm(
+    "Delete brand \"" + brand.name + "\"?\n\n" +
+    "It will disappear from the members' dropdown. Shoots already logged for it are kept.\n" +
+    "This cannot be undone."
+  )){
+    return;
+  }
+
+  state.brands = state.brands.filter(b=>b.id !== brand.id);
+
+  if(state.brandForm.id === brand.id){ state.brandForm = newBrandForm(); }
+
+  if(state.calBrandId === brand.id){ state.calBrandId = null; state.calDay = null; }
+
+  cacheBrands();
+
+  let msg;
+
+  try{
+
+    await saveBrands();
+
+    msg = { type:"ok", text:"\u2713 " + brand.name + " deleted." };
+
+  }catch(error){
+
+    console.error(error);
+
+    msg = {
+      type:"info",
+      text:"\u26a0 Deleted on this device, but couldn't sync to Firebase yet (check Firebase Rules)."
+    };
+
+  }
+
+  flashMsg("brandMsg",msg);
+
+}
+
+function renderBrandsAdmin(){
+
+  const box = el("div");
+
+  box.appendChild(el("div",{
+    class:"section-title",
+    text:"Brands & content calendar"
+  }));
+
+  const sec = el("div",{ class:"search-section", id:"brand-form" });
+
+  const f = state.brandForm;
+
+  const editing = !!f.id;
+
+  sec.appendChild(el("h3",{
+    text: editing ? "Edit calendar: " + f.name : "Add a brand",
+    style:"margin:0 0 14px;font-size:14px;"
+  }));
+
+  /* name */
+
+  const nameField = el("div",{ class:"field" });
+
+  nameField.appendChild(el("label",{ text:"Brand name" }));
+
+  const nameInput = el("input",{
+    placeholder:"e.g. Namastey Salon",
+    value:f.name,
+    disabled:editing
+  });
+
+  nameInput.addEventListener("input",e=>{ f.name = e.target.value; });
+
+  nameField.appendChild(nameInput);
+
+  sec.appendChild(nameField);
+
+  /* daily targets */
+
+  sec.appendChild(el("label",{
+    text:"Daily posting target (how many per day)",
+    style:"display:block;font-size:13.5px;font-weight:600;margin:4px 0 6px;"
+  }));
+
+  const grid = el("div",{
+    style:"display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:14px;"
+  });
+
+  POST_TYPES.forEach(type=>{
+
+    const cell = el("div",{ class:"field" });
+
+    cell.appendChild(el("label",{ text:pluralType(type,2) + " / day" }));
+
+    const input = el("input",{
+      type:"number",
+      min:"0",
+      max:"50",
+      step:"1",
+      placeholder:"0",
+      value: f.counts[type] ? String(f.counts[type]) : ""
+    });
+
+    input.addEventListener("input",e=>{ f.counts[type] = e.target.value; });
+
+    cell.appendChild(input);
+
+    grid.appendChild(cell);
+
+  });
+
+  sec.appendChild(grid);
+
+  /* posting days */
+
+  sec.appendChild(el("label",{
+    text:"Posting days",
+    style:"display:block;font-size:13.5px;font-weight:600;margin:4px 0 6px;"
+  }));
+
+  const dayRow = el("div",{ class:"sc-chips", style:"margin-bottom:16px;" });
+
+  DAY_NAMES.forEach((day,i)=>{
+
+    dayRow.appendChild(el("button",{
+      type:"button",
+      class:"sc-chip" + (f.days.includes(i) ? " on" : ""),
+      text:day,
+      onclick:(e)=>{
+
+        if(f.days.includes(i)){ f.days = f.days.filter(d=>d !== i); }
+        else{ f.days.push(i); }
+
+        e.currentTarget.classList.toggle("on", f.days.includes(i));
+
+      }
+    }));
+
+  });
+
+  sec.appendChild(dayRow);
+
+  /* notes */
+
+  const notesField = el("div",{ class:"field" });
+
+  notesField.appendChild(el("label",{ text:"Notes (optional)" }));
+
+  const notesInput = el("input",{
+    placeholder:"e.g. use trending audio, tag @namasteysalon",
+    value:f.notes
+  });
+
+  notesInput.addEventListener("input",e=>{ f.notes = e.target.value; });
+
+  notesField.appendChild(notesInput);
+
+  sec.appendChild(notesField);
+
+  /* buttons */
+
+  const buttons = el("div",{ class:"button-group" });
+
+  buttons.appendChild(el("button",{
+    class:"secondary",
+    text: editing ? "Save changes" : "Add brand",
+    onclick:submitBrandForm
+  }));
+
+  if(editing){
+
+    buttons.appendChild(el("button",{
+      class:"ghost",
+      text:"Cancel",
+      onclick:()=>{
+        state.brandForm = newBrandForm();
+        state.brandMsg = null;
+        render();
+      }
+    }));
+
+  }
+
+  sec.appendChild(buttons);
+
+  if(state.brandMsg){
+
+    sec.appendChild(el("div",{
+      class:"msg " + state.brandMsg.type,
+      text:state.brandMsg.text
+    }));
+
+  }
+
+  /* list */
+
+  sec.appendChild(el("h3",{
+    text:"Your brands (" + state.brands.length + ") \u2014 click a brand to open its calendar",
+    style:"margin:24px 0 10px;font-size:14px;"
+  }));
+
+  if(!state.brands.length){
+
+    sec.appendChild(el("div",{
+      class:"empty",
+      text:"No brands yet. Add one above \u2014 members will pick from this list when logging a shoot."
+    }));
+
+  }else{
+
+    const scroller = el("div",{ style:"overflow-x:auto;" });
+
+    const table = el("table",{ class:"data-table" });
+
+    const thead = el("thead");
+
+    const headRow = el("tr");
+
+    ["Brand","Daily target","Posting days","Per week","Notes",""].forEach(h=>{
+      headRow.appendChild(el("th",{ text:h }));
+    });
+
+    thead.appendChild(headRow);
+
+    table.appendChild(thead);
+
+    const tbody = el("tbody");
+
+    state.brands.forEach(brand=>{
+
+      const isSel = state.calBrandId === brand.id;
+
+      const row = el("tr",{
+        style:"cursor:pointer;" + (isSel ? "background:var(--accent-soft);" : ""),
+        title:"Click to open this brand's calendar",
+        onclick:()=>{ openBrandCalendar(brand.id); }
+      });
+
+      row.appendChild(el("td",{
+        text:(isSel ? "\u25be " : "\u25b8 ") + brand.name,
+        style:"font-weight:600;color:var(--accent);"
+      }));
+
+      row.appendChild(el("td",{ text:brandDailyText(brand) }));
+
+      row.appendChild(el("td",{ text:brandDaysText(brand) }));
+
+      row.appendChild(el("td",{ text:String(brandWeeklyTotal(brand)) }));
+
+      row.appendChild(el("td",{
+        text:brand.notes || "-",
+        style:"white-space:normal;min-width:200px;max-width:320px;"
+      }));
+
+      const actions = el("td",{ style:"white-space:nowrap;" });
+
+      actions.appendChild(el("button",{
+        class:"btn-edit",
+        text:"Edit",
+        onclick:(e)=>{ e.stopPropagation(); startEditBrand(brand); }
+      }));
+
+      actions.appendChild(el("button",{
+        class:"btn-delete",
+        text:"Delete",
+        onclick:(e)=>{ e.stopPropagation(); deleteBrand(brand); }
+      }));
+
+      row.appendChild(actions);
+
+      tbody.appendChild(row);
+
+    });
+
+    table.appendChild(tbody);
+
+    scroller.appendChild(table);
+
+    sec.appendChild(scroller);
+
+  }
+
+  const calBrand = state.brands.find(b=>b.id === state.calBrandId);
+
+  if(calBrand){
+
+    sec.appendChild(renderBrandCalendar(calBrand));
+
+  }
+
+  box.appendChild(sec);
+
+  return box;
+
+}
+
+
+/* ============================================================
+   BRAND CALENDAR (target vs logged, per day)
+   Counts every shoot logged for the brand on that date, by
+   content type, against the brand's daily targets. It reads the
+   same entries the members' form saves, so it updates itself.
+   ============================================================ */
+
+function pad2(n){ return String(n).padStart(2,"0"); }
+
+function localISO(d){
+
+  return d.getFullYear() + "-" + pad2(d.getMonth()+1) + "-" + pad2(d.getDate());
+
+}
+
+function rerenderKeepScroll(){
+
+  const y = window.scrollY;
+
+  render();
+
+  window.scrollTo(0,y);
+
+}
+
+function openBrandCalendar(id){
+
+  if(state.calBrandId === id){
+
+    state.calBrandId = null;
+
+    state.calDay = null;
+
+    rerenderKeepScroll();
+
+    return;
+
+  }
+
+  const now = new Date();
+
+  state.calBrandId = id;
+
+  state.calMonth = now.getFullYear() + "-" + pad2(now.getMonth()+1);
+
+  state.calDay = null;
+
+  render();
+
+  const target = document.getElementById("brand-calendar");
+
+  if(target){ target.scrollIntoView({ behavior:"smooth", block:"start" }); }
+
+  refreshFromCloud();
+
+}
+
+function shiftCalMonth(delta){
+
+  const [y,m] = state.calMonth.split("-").map(Number);
+
+  const d = new Date(y, m-1+delta, 1);
+
+  state.calMonth = d.getFullYear() + "-" + pad2(d.getMonth()+1);
+
+  state.calDay = null;
+
+  rerenderKeepScroll();
+
+}
+
+/* Pull the latest entries/brands from the cloud so the calendar
+   reflects what members logged on their own phones. Only runs when
+   the connection test is green, so it can never wipe unsynced local
+   work. Re-renders only if something actually changed. */
+
+async function refreshFromCloud(){
+
+  if(!db || state.connectionStatus.state !== "ok") return;
+
+  const before = JSON.stringify([state.entries,state.brands]);
+
+  try{
+
+    const entriesData = (await db.ref("entries").once("value")).val();
+
+    if(entriesData){
+
+      state.entries =
+        Object.values(entriesData).sort(
+          (a,b)=>new Date(b.date || 0) - new Date(a.date || 0)
+        );
+
+      cacheEntries();
+
+    }
+
+    const brandsData = (await db.ref("brands").once("value")).val();
+
+    if(brandsData && !state.brandsDirty){
+
+      state.brands =
+        Object.entries(brandsData)
+          .filter(([k,v])=>k !== "_meta" && v && typeof v === "object")
+          .map(([k,v])=>v)
+          .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
+
+      cacheBrands();
+
+    }
+
+  }catch(error){
+
+    console.error("Calendar refresh failed:", error);
+
+    return;
+
+  }
+
+  const after = JSON.stringify([state.entries,state.brands]);
+
+  const typing =
+    document.activeElement &&
+    /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+
+  if(before !== after && state.view === "admin" && !state.editingEntry && !typing){
+
+    rerenderKeepScroll();
+
+  }
+
+}
+
+/* ---- per-day targets / admin adjustments -------------------------
+   brand.overrides[date] = custom target for that single day
+   brand.manual[date]    = posts the admin marked as done by hand
+   Calendar total for a day = logged by the team + marked by admin.
+   ------------------------------------------------------------------ */
+
+function isoIdx(iso){
+
+  const [y,m,d] = iso.split("-").map(Number);
+
+  return (new Date(y,m-1,d).getDay() + 6) % 7;
+
+}
+
+function dayTargetsFor(brand,iso){
+
+  const override = (brand.overrides || {})[iso];
+
+  const counts = brandCounts(brand);
+
+  const on = brandDays(brand).includes(isoIdx(iso));
+
+  const result = {};
+
+  POST_TYPES.forEach(type=>{
+
+    result[type] = override
+      ? Math.max(0, Number(override[type]) || 0)
+      : (on ? counts[type] : 0);
+
+  });
+
+  return result;
+
+}
+
+function dayManualFor(brand,iso){
+
+  const manual = (brand.manual || {})[iso] || {};
+
+  const result = {};
+
+  POST_TYPES.forEach(type=>{ result[type] = Math.max(0, Number(manual[type]) || 0); });
+
+  return result;
+
+}
+
+function dayAdjusted(brand,iso){
+
+  return !!((brand.overrides || {})[iso]) ||
+    Object.values(dayManualFor(brand,iso)).some(n=>n > 0);
+
+}
+
+async function persistBrandChange(){
+
+  cacheBrands();
+
+  rerenderKeepScroll();
+
+  try{
+
+    await saveBrands();
+
+    state.calMsg = { type:"ok", text:"\u2713 Calendar updated." };
+
+  }catch(error){
+
+    console.error(error);
+
+    state.calMsg = {
+      type:"info",
+      text:"\u26a0 Saved on this device, but couldn't sync to Firebase yet."
+    };
+
+  }
+
+  rerenderKeepScroll();
+
+}
+
+function adjustManual(brand,iso,type,delta){
+
+  brand.manual = brand.manual || {};
+
+  const day = brand.manual[iso] = brand.manual[iso] || {};
+
+  day[type] = Math.max(0, Math.min(99, (Number(day[type]) || 0) + delta));
+
+  if(Object.values(day).every(n=>!n)){ delete brand.manual[iso]; }
+
+  persistBrandChange();
+
+}
+
+function setTargetOverride(brand,iso,type,value){
+
+  brand.overrides = brand.overrides || {};
+
+  if(!brand.overrides[iso]){ brand.overrides[iso] = dayTargetsFor(brand,iso); }
+
+  brand.overrides[iso][type] =
+    Math.max(0, Math.min(50, Math.floor(Number(value)) || 0));
+
+  persistBrandChange();
+
+}
+
+function resetDayAdjustments(brand,iso){
+
+  if(brand.overrides){ delete brand.overrides[iso]; }
+
+  if(brand.manual){ delete brand.manual[iso]; }
+
+  persistBrandChange();
+
+}
+
+function renderBrandCalendar(brand){
+
+  const box = el("div",{
+    id:"brand-calendar",
+    style:"margin-top:26px;border-top:1px solid var(--rule);padding-top:20px;"
+  });
+
+  const [Y,M] = state.calMonth.split("-").map(Number);
+
+  const first = new Date(Y,M-1,1);
+
+  const monthLabel =
+    first.toLocaleDateString("en-IN",{ month:"long", year:"numeric" });
+
+  const todayStr = localISO(new Date());
+
+  const bn = normName(brand.name);
+
+  /* logged[date][type] = shoots members logged through the form */
+
+  const logged = {};
+
+  state.entries.forEach(entry=>{
+
+    if(!entry.date || normName(entry.brand) !== bn) return;
+
+    logged[entry.date] = logged[entry.date] || {};
+
+    logged[entry.date][entry.contentType] =
+      (logged[entry.date][entry.contentType] || 0) + 1;
+
+  });
+
+  const postedFor = (iso,type)=>
+    ((logged[iso] || {})[type] || 0) + dayManualFor(brand,iso)[type];
+
+  /* header + controls */
+
+  const head = el("div",{
+    style:"display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;"
+  });
+
+  const titleBox = el("div");
+
+  titleBox.appendChild(el("h3",{
+    text:brand.name + " \u2014 content calendar",
+    style:"margin:0;font-size:15px;"
+  }));
+
+  titleBox.appendChild(el("div",{
+    text:"Default target: " + brandDailyText(brand) + " \u00b7 " + brandDaysText(brand),
+    style:"font-size:12.5px;color:var(--ink-dim);margin-top:3px;"
+  }));
+
+  head.appendChild(titleBox);
+
+  const controls = el("div",{ style:"display:flex;flex-wrap:wrap;align-items:center;" });
+
+  controls.appendChild(el("button",{
+    class:"btn-small", text:"\u2039", title:"Previous month",
+    onclick:()=>{ shiftCalMonth(-1); }
+  }));
+
+  controls.appendChild(el("span",{
+    text:monthLabel,
+    style:"font-size:13px;font-weight:600;min-width:130px;text-align:center;margin-left:8px;"
+  }));
+
+  controls.appendChild(el("button",{
+    class:"btn-small", text:"\u203a", title:"Next month",
+    onclick:()=>{ shiftCalMonth(1); }
+  }));
+
+  controls.appendChild(el("button",{
+    class:"btn-small", text:"Today",
+    onclick:()=>{
+      const n = new Date();
+      state.calMonth = n.getFullYear() + "-" + pad2(n.getMonth()+1);
+      state.calDay = null;
+      rerenderKeepScroll();
+    }
+  }));
+
+  controls.appendChild(el("button",{
+    class:"btn-small", text:"Refresh",
+    onclick:()=>{ refreshFromCloud(); }
+  }));
+
+  controls.appendChild(el("button",{
+    class:"btn-small", text:"Edit defaults",
+    onclick:()=>{ startEditBrand(brand); }
+  }));
+
+  controls.appendChild(el("button",{
+    class:"btn-small", text:"Close",
+    onclick:()=>{ openBrandCalendar(brand.id); }
+  }));
+
+  head.appendChild(controls);
+
+  box.appendChild(head);
+
+  /* month figures */
+
+  const daysInMonth = new Date(Y,M,0).getDate();
+
+  let targetSoFar = 0, doneSoFar = 0, missedDays = 0, completeDays = 0, activeDays = 0, monthTarget = 0;
+
+  for(let d=1; d<=daysInMonth; d++){
+
+    const iso = Y + "-" + pad2(M) + "-" + pad2(d);
+
+    const targets = dayTargetsFor(brand,iso);
+
+    const sum = POST_TYPES.reduce((a,t)=>a + targets[t],0);
+
+    monthTarget += sum;
+
+    if(!sum || iso > todayStr) continue;
+
+    activeDays++;
+
+    let allMet = true;
+
+    POST_TYPES.forEach(type=>{
+
+      if(!targets[type]) return;
+
+      const got = postedFor(iso,type);
+
+      targetSoFar += targets[type];
+
+      doneSoFar += Math.min(got,targets[type]);
+
+      if(got < targets[type]) allMet = false;
+
+    });
+
+    if(allMet){ completeDays++; }
+    else if(iso < todayStr){ missedDays++; }
+
+  }
+
+  const pct = targetSoFar ? Math.round(doneSoFar / targetSoFar * 100) : 0;
+
+  const stats = el("div",{ class:"member-stats", style:"margin-bottom:14px;" });
+
+  [
+    ["Posted vs target (to date)", doneSoFar + " / " + targetSoFar + " (" + pct + "%)"],
+    ["Days fully done", completeDays + " of " + activeDays],
+    ["Days missed", String(missedDays)],
+    ["Posts needed this month", String(monthTarget)]
+  ].forEach(([label,value])=>{
+
+    const stat = el("div",{ class:"member-stat" });
+
+    stat.appendChild(el("div",{ class:"label", text:label }));
+
+    stat.appendChild(el("div",{ class:"value", text:value }));
+
+    stats.appendChild(stat);
+
+  });
+
+  box.appendChild(stats);
+
+  /* legend */
+
+  const legend = el("div",{
+    style:"display:flex;flex-wrap:wrap;gap:14px;font-size:11.5px;color:var(--ink-dim);margin-bottom:10px;"
+  });
+
+  [
+    ["rgba(30,142,90,0.16)","Target met"],
+    ["rgba(184,134,11,0.18)","Partly done"],
+    ["rgba(230,57,70,0.13)","Missed"],
+    ["var(--panel-alt)","Upcoming / day off"]
+  ].forEach(([color,label])=>{
+
+    const item = el("span",{ style:"display:inline-flex;align-items:center;gap:6px;" });
+
+    item.appendChild(el("span",{
+      style:"width:12px;height:12px;border-radius:3px;border:1px solid var(--rule);background:" + color + ";"
+    }));
+
+    item.appendChild(document.createTextNode(label));
+
+    legend.appendChild(item);
+
+  });
+
+  legend.appendChild(el("span",{ text:"\u270e = adjusted by admin" }));
+
+  box.appendChild(legend);
+
+  /* grid */
+
+  const scroller = el("div",{ style:"overflow-x:auto;" });
+
+  const grid = el("div",{
+    style:"display:grid;grid-template-columns:repeat(7,minmax(78px,1fr));gap:6px;min-width:560px;"
+  });
+
+  DAY_NAMES.forEach(name=>{
+
+    grid.appendChild(el("div",{
+      text:name,
+      style:"font-size:11px;font-weight:700;letter-spacing:0.06em;color:var(--ink-dim);text-align:center;padding:4px 0;"
+    }));
+
+  });
+
+  const blanks = (first.getDay() + 6) % 7;
+
+  for(let i=0; i<blanks; i++){ grid.appendChild(el("div")); }
+
+  for(let d=1; d<=daysInMonth; d++){
+
+    const iso = Y + "-" + pad2(M) + "-" + pad2(d);
+
+    const targets = dayTargetsFor(brand,iso);
+
+    const targetTypes = POST_TYPES.filter(t=>targets[t] > 0);
+
+    const shownTypes = POST_TYPES.filter(t=>targets[t] > 0 || postedFor(iso,t) > 0);
+
+    const isPast = iso < todayStr;
+
+    const isToday = iso === todayStr;
+
+    let bg = "var(--panel-alt)";
+
+    let mark = "";
+
+    if(targetTypes.length){
+
+      const met = targetTypes.every(t=>postedFor(iso,t) >= targets[t]);
+
+      const any = targetTypes.some(t=>postedFor(iso,t) > 0);
+
+      if(met){ bg = "rgba(30,142,90,0.16)"; mark = "\u2713"; }
+      else if(any){ bg = isPast ? "rgba(230,57,70,0.13)" : "rgba(184,134,11,0.18)"; mark = isPast ? "!" : "\u2026"; }
+      else if(isPast){ bg = "rgba(230,57,70,0.13)"; mark = "!"; }
+
+    }
+
+    const selected = state.calDay === iso;
+
+    const cell = el("div",{
+      title:"Click to see or adjust this day",
+      style:
+        "min-height:84px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:11.5px;background:" + bg + ";" +
+        "border:" + (selected ? "2px solid var(--accent)" : (isToday ? "1px solid var(--accent)" : "1px solid var(--rule)")) + ";",
+      onclick:()=>{
+        state.calDay = state.calDay === iso ? null : iso;
+        state.calMsg = null;
+        rerenderKeepScroll();
+      }
+    });
+
+    const top = el("div",{ style:"display:flex;justify-content:space-between;margin-bottom:4px;" });
+
+    top.appendChild(el("span",{ text:String(d), style:"font-weight:700;font-size:12.5px;" }));
+
+    top.appendChild(el("span",{
+      text:(dayAdjusted(brand,iso) ? "\u270e " : "") + mark,
+      style:"font-weight:700;"
+    }));
+
+    cell.appendChild(top);
+
+    if(!shownTypes.length){
+
+      cell.appendChild(el("div",{ text:"Off", style:"color:var(--ink-dim);" }));
+
+    }else{
+
+      shownTypes.forEach(type=>{
+
+        const got = postedFor(iso,type);
+
+        const ok = targets[type] > 0 && got >= targets[type];
+
+        cell.appendChild(el("div",{
+          text:type + " " + got + "/" + targets[type],
+          style:"line-height:1.5;color:" + (ok ? "var(--green)" : "var(--ink)") + ";font-weight:" + (ok ? "600" : "400") + ";"
+        }));
+
+      });
+
+    }
+
+    grid.appendChild(cell);
+
+  }
+
+  scroller.appendChild(grid);
+
+  box.appendChild(scroller);
+
+  /* selected day: team log + admin adjustment */
+
+  if(state.calDay){
+
+    const iso = state.calDay;
+
+    const dayEntries =
+      state.entries.filter(entry=>
+        entry.date === iso && normName(entry.brand) === bn
+      );
+
+    const [dy,dm,dd] = iso.split("-").map(Number);
+
+    const pretty =
+      new Date(dy,dm-1,dd).toLocaleDateString("en-IN",{
+        weekday:"long", day:"numeric", month:"long", year:"numeric"
+      });
+
+    const detail = el("div",{
+      style:"margin-top:16px;padding:14px 16px;border:1px solid var(--rule);border-radius:6px;background:var(--panel-alt);"
+    });
+
+    detail.appendChild(el("div",{
+      text:pretty,
+      style:"font-weight:700;font-size:14px;margin-bottom:10px;"
+    }));
+
+    /* 1. what the team logged through the form */
+
+    detail.appendChild(el("div",{
+      text:"Logged by the team (" + dayEntries.length + ")",
+      style:"font-weight:600;font-size:12.5px;margin-bottom:4px;"
+    }));
+
+    if(!dayEntries.length){
+
+      detail.appendChild(el("div",{
+        text:"Nothing logged through the form for " + brand.name + " on this day.",
+        style:"font-size:12.5px;color:var(--ink-dim);margin-bottom:6px;"
+      }));
+
+    }
+
+    dayEntries.forEach(entry=>{
+
+      const line = el("div",{
+        style:"display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--rule);font-size:12.5px;"
+      });
+
+      line.appendChild(el("span",{
+        text:
+          (entry.contentType || "-") + " \u00b7 " +
+          (entry.member || "-") + " \u00b7 " +
+          (entry.status || "-") +
+          (entry.reelTopic ? " \u00b7 " + entry.reelTopic : "")
+      }));
+
+      const acts = el("span",{ style:"white-space:nowrap;" });
+
+      acts.appendChild(el("button",{
+        class:"btn-edit", text:"Edit",
+        onclick:()=>{ openEditEntry(entry); }
+      }));
+
+      acts.appendChild(el("button",{
+        class:"btn-delete", text:"Delete",
+        onclick:()=>{ deleteEntry(entry.id); }
+      }));
+
+      line.appendChild(acts);
+
+      detail.appendChild(line);
+
+    });
+
+    /* 2. admin: adjust this day by hand */
+
+    detail.appendChild(el("div",{
+      text:"Admin adjustment for this day",
+      style:"font-weight:600;font-size:12.5px;margin:14px 0 2px;"
+    }));
+
+    detail.appendChild(el("div",{
+      text:"Mark posts as done by hand or change this day's target. The team's form entries are added on top of what you mark here.",
+      style:"font-size:12px;color:var(--ink-dim);margin-bottom:6px;"
+    }));
+
+    const targets = dayTargetsFor(brand,iso);
+
+    const manual = dayManualFor(brand,iso);
+
+    const gridStyle =
+      "display:grid;grid-template-columns:minmax(70px,1fr) 1fr 1.4fr 84px;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--rule);font-size:12.5px;";
+
+    const headRow = el("div",{
+      style:gridStyle + "font-size:11px;font-weight:700;color:var(--ink-dim);letter-spacing:0.04em;"
+    });
+
+    ["TYPE","LOGGED BY TEAM","MARKED BY ADMIN","TARGET"].forEach(h=>{
+      headRow.appendChild(el("span",{ text:h }));
+    });
+
+    detail.appendChild(headRow);
+
+    POST_TYPES.forEach(type=>{
+
+      const row = el("div",{ style:gridStyle });
+
+      row.appendChild(el("span",{ text:type, style:"font-weight:600;" }));
+
+      row.appendChild(el("span",{ text:String(((logged[iso] || {})[type]) || 0) }));
+
+      const stepper = el("span",{ style:"display:inline-flex;align-items:center;gap:6px;" });
+
+      stepper.appendChild(el("button",{
+        class:"btn-small", text:"\u2212",
+        onclick:()=>{ adjustManual(brand,iso,type,-1); }
+      }));
+
+      stepper.appendChild(el("span",{
+        text:String(manual[type]),
+        style:"min-width:18px;text-align:center;font-weight:700;"
+      }));
+
+      stepper.appendChild(el("button",{
+        class:"btn-small", text:"+",
+        onclick:()=>{ adjustManual(brand,iso,type,1); }
+      }));
+
+      row.appendChild(stepper);
+
+      const targetInput = el("input",{
+        type:"number", min:"0", max:"50", step:"1",
+        value:String(targets[type]),
+        style:"width:72px;padding:6px 8px;border:1px solid var(--rule);border-radius:4px;background:var(--panel);color:var(--ink);font-size:13px;"
+      });
+
+      targetInput.addEventListener("change",e=>{
+        setTargetOverride(brand,iso,type,e.target.value);
+      });
+
+      row.appendChild(targetInput);
+
+      detail.appendChild(row);
+
+    });
+
+    if(dayAdjusted(brand,iso)){
+
+      const resetRow = el("div",{ style:"margin-top:10px;" });
+
+      resetRow.appendChild(el("button",{
+        class:"btn-small",
+        text:"Reset this day to default",
+        onclick:()=>{ resetDayAdjustments(brand,iso); }
+      }));
+
+      detail.appendChild(resetRow);
+
+    }
+
+    if(state.calMsg){
+
+      detail.appendChild(el("div",{
+        class:"msg " + state.calMsg.type,
+        text:state.calMsg.text
+      }));
+
+    }
+
+    box.appendChild(detail);
+
+  }
+
+  return box;
+
+}
+
+
+/* ============================================================
+   MESSAGES  (admin -> one person)
+   Each message is its own Firebase child (messages/<id>), so a
+   person marking theirs as read can never overwrite the admin's
+   other messages.
+   ============================================================ */
+
+async function loadMessages(){
+
+  if(!db) return false;
+
+  try{
+
+    const snap = await db.ref("messages").once("value");
+
+    const data = snap.val();
+
+    state.messages =
+      data
+        ? Object.values(data)
+            .filter(m=>m && m.id && m.to && m.text)
+            .sort((a,b)=>(b.createdAt || 0) - (a.createdAt || 0))
+        : [];
+
+    return true;
+
+  }catch(error){
+
+    console.error("Load messages failed:", error);
+
+    return false;
+
+  }
+
+}
+
+async function sendMessage(){
+
+  const to = state.msgForm.to;
+
+  const text = state.msgForm.text.trim();
+
+  if(!to){
+
+    flashMsg("msgNotice",{ type:"err", text:"Choose who the message is for." });
+
+    return;
+
+  }
+
+  if(!text){
+
+    flashMsg("msgNotice",{ type:"err", text:"Write a message first." });
+
+    return;
+
+  }
+
+  if(!db){
+
+    flashMsg("msgNotice",{ type:"err", text:"Couldn't send: no connection to Firebase." });
+
+    return;
+
+  }
+
+  const message = {
+    id:"m" + Date.now(),
+    to,
+    text:text.slice(0,500),
+    from:"Admin",
+    createdAt:Date.now()
+  };
+
+  try{
+
+    await db.ref("messages/" + message.id).set(message);
+
+  }catch(error){
+
+    console.error(error);
+
+    flashMsg("msgNotice",{
+      type:"err",
+      text:"Couldn't send. Check your connection and Firebase Rules (the 'messages' path must be writable)."
+    });
+
+    return;
+
+  }
+
+  state.messages.unshift(message);
+
+  state.msgForm.text = "";
+
+  flashMsg("msgNotice",{ type:"ok", text:"\u2713 Sent to " + to + "." });
+
+}
+
+async function markMessageRead(id){
+
+  const message = state.messages.find(m=>m.id === id);
+
+  if(!message) return;
+
+  message.readAt = Date.now();
+
+  rerenderKeepScroll();
+
+  try{
+
+    await db.ref("messages/" + id).update({ readAt:message.readAt });
+
+  }catch(error){
+
+    console.error("Could not save read receipt:", error);
+
+  }
+
+}
+
+async function deleteMessage(id){
+
+  state.messages = state.messages.filter(m=>m.id !== id);
+
+  rerenderKeepScroll();
+
+  try{
+
+    await db.ref("messages/" + id).remove();
+
+  }catch(error){
+
+    console.error("Could not delete message:", error);
+
+  }
+
+}
+
+function fmtMsgTime(ts){
+
+  return new Date(ts).toLocaleString("en-IN",{
+    day:"numeric", month:"short", hour:"numeric", minute:"2-digit"
+  });
+
+}
+
+function renderMessagesAdmin(){
+
+  const box = el("div");
+
+  box.appendChild(el("div",{ class:"section-title", text:"Message a person" }));
+
+  const sec = el("div",{ class:"search-section" });
+
+  const toField = el("div",{ class:"field" });
+
+  toField.appendChild(el("label",{ text:"To" }));
+
+  const toSelect = el("select",{});
+
+  toSelect.appendChild(el("option",{
+    value:"",
+    text: state.members.length ? "Select a person..." : "No people added yet"
+  }));
+
+  state.members.forEach(name=>{
+    toSelect.appendChild(el("option",{ value:name, text:name }));
+  });
+
+  toSelect.value = state.msgForm.to;
+
+  toSelect.disabled = !state.members.length;
+
+  toSelect.addEventListener("change",e=>{ state.msgForm.to = e.target.value; });
+
+  toField.appendChild(toSelect);
+
+  sec.appendChild(toField);
+
+  const textField = el("div",{ class:"field" });
+
+  textField.appendChild(el("label",{ text:"Message" }));
+
+  const textInput = el("textarea",{
+    placeholder:"e.g. Please upload today's Namastey Salon reels before 6 PM.",
+    maxLength:500,
+    value:state.msgForm.text
+  });
+
+  textInput.addEventListener("input",e=>{ state.msgForm.text = e.target.value; });
+
+  textField.appendChild(textInput);
+
+  sec.appendChild(textField);
+
+  const buttons = el("div",{ class:"button-group" });
+
+  buttons.appendChild(el("button",{
+    class:"secondary",
+    text:"Send message",
+    onclick:sendMessage
+  }));
+
+  sec.appendChild(buttons);
+
+  if(state.msgNotice){
+
+    sec.appendChild(el("div",{
+      class:"msg " + state.msgNotice.type,
+      text:state.msgNotice.text
+    }));
+
+  }
+
+  sec.appendChild(el("h3",{
+    text:"Sent messages (" + state.messages.length + ")",
+    style:"margin:24px 0 10px;font-size:14px;"
+  }));
+
+  if(!state.messages.length){
+
+    sec.appendChild(el("div",{ class:"empty", text:"No messages sent yet." }));
+
+  }else{
+
+    const scroller = el("div",{ style:"overflow-x:auto;" });
+
+    const table = el("table",{ class:"data-table" });
+
+    const thead = el("thead");
+
+    const headRow = el("tr");
+
+    ["To","Message","Sent","Status",""].forEach(h=>{
+      headRow.appendChild(el("th",{ text:h }));
+    });
+
+    thead.appendChild(headRow);
+
+    table.appendChild(thead);
+
+    const tbody = el("tbody");
+
+    state.messages.forEach(message=>{
+
+      const row = el("tr");
+
+      row.appendChild(el("td",{ text:message.to, style:"font-weight:600;" }));
+
+      row.appendChild(el("td",{
+        text:message.text,
+        style:"white-space:normal;min-width:200px;max-width:340px;"
+      }));
+
+      row.appendChild(el("td",{ text:fmtMsgTime(message.createdAt) }));
+
+      row.appendChild(el("td",{
+        text: message.readAt ? "Read " + fmtMsgTime(message.readAt) : "Unread",
+        style:"color:" + (message.readAt ? "var(--green)" : "var(--amber)") + ";font-weight:600;"
+      }));
+
+      const actions = el("td",{ style:"white-space:nowrap;" });
+
+      actions.appendChild(el("button",{
+        class:"btn-delete",
+        text:"Delete",
+        onclick:()=>{ deleteMessage(message.id); }
+      }));
+
+      row.appendChild(actions);
+
+      tbody.appendChild(row);
+
+    });
+
+    table.appendChild(tbody);
+
+    scroller.appendChild(table);
+
+    sec.appendChild(scroller);
+
+  }
+
+  box.appendChild(sec);
+
+  return box;
+
+}
+
+function renderMemberMessages(){
+
+  const box = el("div");
+
+  const mine = state.messages.filter(m=>m.to === state.currentUser);
+
+  if(!mine.length) return box;
+
+  const unread = mine.filter(m=>!m.readAt).length;
+
+  const card = el("div",{
+    style:"background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--accent);border-radius:6px;padding:14px 16px;margin-bottom:18px;"
+  });
+
+  card.appendChild(el("div",{
+    text:"Messages from admin" + (unread ? " (" + unread + " new)" : ""),
+    style:"font-weight:700;font-size:14px;margin-bottom:6px;"
+  }));
+
+  mine.slice(0,5).forEach(message=>{
+
+    const row = el("div",{
+      style:"padding:10px 0;border-top:1px solid var(--rule);" + (message.readAt ? "opacity:0.65;" : "")
+    });
+
+    row.appendChild(el("div",{
+      text:message.text,
+      style:"font-size:14px;line-height:1.45;white-space:pre-wrap;" + (message.readAt ? "" : "font-weight:600;")
+    }));
+
+    const meta = el("div",{
+      style:"display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;font-size:11.5px;color:var(--ink-dim);"
+    });
+
+    meta.appendChild(el("span",{ text:fmtMsgTime(message.createdAt) }));
+
+    if(!message.readAt){
+
+      meta.appendChild(el("button",{
+        class:"btn-small",
+        text:"Mark as read",
+        onclick:()=>{ markMessageRead(message.id); }
+      }));
+
+    }
+
+    row.appendChild(meta);
+
+    card.appendChild(row);
+
+  });
+
+  box.appendChild(card);
+
+  return box;
+
+}
+
+
+/* ============================================================
+   PEOPLE — DELETE A PERSON (admin)
+   ============================================================ */
+
+async function deleteMember(name){
+
+  const shootCount =
+    state.entries.filter(entry=>entry.member === name).length;
+
+  if(!confirm(
+    "Delete " + name + "?\n\n" +
+    "They will be removed from the name list. " +
+    (shootCount
+      ? "Their " + shootCount + " logged shoot(s) are kept in the records."
+      : "They have no logged shoots.") +
+    "\nThis cannot be undone."
+  )){
+    return;
+  }
+
+  state.members = state.members.filter(m=>m !== name);
+
+  if(state.currentUser === name){
+
+    state.currentUser = null;
+
+    localStorage.removeItem("currentUser");
+
+  }
+
+  cacheMembers();
+
+  let msg;
+
+  try{
+
+    await saveMembers();
+
+    msg = { type:"ok", text:"\u2713 " + name + " deleted." };
+
+  }catch(error){
+
+    console.error(error);
+
+    msg = {
+      type:"info",
+      text:"\u26a0 Deleted on this device, but couldn't sync to Firebase yet (check Firebase Rules)."
+    };
+
+  }
+
+  flashMsg("peopleMsg",msg);
+
+}
+
+function renderPeopleAdmin(){
+
+  const box = el("div");
+
+  box.appendChild(el("div",{
+    class:"section-title",
+    text:"People"
+  }));
+
+  const sec = el("div",{ class:"search-section" });
+
+  sec.appendChild(el("p",{
+    text:"Deleting a person removes their name from the team list. Their logged shoots stay in the records.",
+    style:"margin:0 0 14px;font-size:13px;color:var(--ink-dim);"
+  }));
+
+  if(!state.members.length){
+
+    sec.appendChild(el("div",{ class:"empty", text:"No people added yet." }));
+
+  }else{
+
+    const scroller = el("div",{ style:"overflow-x:auto;" });
+
+    const table = el("table",{ class:"data-table" });
+
+    const thead = el("thead");
+
+    const headRow = el("tr");
+
+    ["Name","Shoots logged",""].forEach(h=>{
+      headRow.appendChild(el("th",{ text:h }));
+    });
+
+    thead.appendChild(headRow);
+
+    table.appendChild(thead);
+
+    const tbody = el("tbody");
+
+    state.members.forEach(name=>{
+
+      const row = el("tr");
+
+      row.appendChild(el("td",{ text:name }));
+
+      row.appendChild(el("td",{
+        text:String(state.entries.filter(entry=>entry.member === name).length)
+      }));
+
+      const actions = el("td",{ style:"white-space:nowrap;" });
+
+      actions.appendChild(el("button",{
+        class:"btn-delete",
+        text:"Delete",
+        onclick:()=>{ deleteMember(name); }
+      }));
+
+      row.appendChild(actions);
+
+      tbody.appendChild(row);
+
+    });
+
+    table.appendChild(tbody);
+
+    scroller.appendChild(table);
+
+    sec.appendChild(scroller);
+
+  }
+
+  if(state.peopleMsg){
+
+    sec.appendChild(el("div",{
+      class:"msg " + state.peopleMsg.type,
+      text:state.peopleMsg.text
+    }));
+
+  }
+
+  box.appendChild(sec);
+
+  return box;
 
 }
 
@@ -3723,6 +5752,19 @@ function renderAdmin(){
     wrap.appendChild(renderEditEntryPanel());
 
   }
+
+
+  /* BRANDS + CONTENT CALENDAR */
+
+  wrap.appendChild(renderBrandsAdmin());
+
+  /* PEOPLE (delete) */
+
+  wrap.appendChild(renderPeopleAdmin());
+
+  /* MESSAGES to a person */
+
+  wrap.appendChild(renderMessagesAdmin());
 
 
   /* MEMBER SEARCH */
@@ -4783,6 +6825,40 @@ window.addEventListener(
   "load",
   loadAll
 );
+
+/* New messages / read receipts show up without a manual refresh. */
+
+setInterval(async ()=>{
+
+  if(state.view !== "member" && state.view !== "admin") return;
+
+  const before = JSON.stringify(state.messages);
+
+  const ok = await loadMessages();
+
+  if(!ok || before === JSON.stringify(state.messages)) return;
+
+  const typing =
+    document.activeElement &&
+    /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+
+  if(typing || state.editingEntry) return;
+
+  rerenderKeepScroll();
+
+}, 30000);
+
+/* Keep an open brand calendar fresh while the admin leaves it on screen. */
+
+setInterval(()=>{
+
+  if(state.view === "admin" && state.calBrandId){
+
+    refreshFromCloud();
+
+  }
+
+}, 30000);
 
 </script>
 
