@@ -906,6 +906,14 @@ let state = {
 
   calMsg: null,
 
+  calAllMonth: null,
+
+  calAllDay: null,
+
+  chartName: "",
+
+  chartBrand: "",
+
   brandsDirty: false,
 
   messages: [],
@@ -5360,6 +5368,628 @@ function renderMemberMessages(){
 
 
 /* ============================================================
+   TEAM CHART FILTERS  (name + brand)
+   ============================================================ */
+
+function renderTeamChartFilters(names,shownShoots){
+
+  const bar = el("div",{
+    style:"display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-bottom:14px;"
+  });
+
+  const mk = (label,select)=>{
+
+    const box = el("div",{ class:"field", style:"margin:0;min-width:170px;flex:1;" });
+
+    box.appendChild(el("label",{ text:label }));
+
+    box.appendChild(select);
+
+    return box;
+
+  };
+
+  /* name */
+
+  const nameSel = el("select",{});
+
+  nameSel.appendChild(el("option",{ value:"", text:"All people" }));
+
+  names.forEach(name=>{
+    nameSel.appendChild(el("option",{ value:name, text:name }));
+  });
+
+  nameSel.value = state.chartName;
+
+  nameSel.addEventListener("change",e=>{
+    state.chartName = e.target.value;
+    rerenderKeepScroll();
+  });
+
+  bar.appendChild(mk("Filter by name",nameSel));
+
+  /* brand: admin's brand list + any older free-typed brand in entries */
+
+  const brandNames = [];
+
+  const seen = new Set();
+
+  state.brands.forEach(b=>{
+    seen.add(normName(b.name));
+    brandNames.push(b.name);
+  });
+
+  state.entries.forEach(entry=>{
+    if(entry.brand && !seen.has(normName(entry.brand))){
+      seen.add(normName(entry.brand));
+      brandNames.push(entry.brand);
+    }
+  });
+
+  const brandSel = el("select",{});
+
+  brandSel.appendChild(el("option",{ value:"", text:"All brands" }));
+
+  brandNames.forEach(name=>{
+    brandSel.appendChild(el("option",{ value:name, text:name }));
+  });
+
+  brandSel.value = state.chartBrand;
+
+  brandSel.addEventListener("change",e=>{
+    state.chartBrand = e.target.value;
+    rerenderKeepScroll();
+  });
+
+  bar.appendChild(mk("Filter by brand",brandSel));
+
+  if(state.chartName || state.chartBrand){
+
+    bar.appendChild(el("button",{
+      class:"btn-small",
+      text:"Clear filters",
+      style:"margin-bottom:16px;",
+      onclick:()=>{
+        state.chartName = "";
+        state.chartBrand = "";
+        rerenderKeepScroll();
+      }
+    }));
+
+  }
+
+  const wrapper = el("div");
+
+  wrapper.appendChild(bar);
+
+  wrapper.appendChild(el("div",{
+    text:
+      "Showing " + shownShoots + " shoot" + (shownShoots === 1 ? "" : "s") +
+      (state.chartName ? " \u00b7 " + state.chartName : "") +
+      (state.chartBrand ? " \u00b7 " + state.chartBrand : ""),
+    style:"font-size:12.5px;color:var(--ink-dim);margin:-6px 0 12px;"
+  }));
+
+  return wrapper;
+
+}
+
+
+/* ============================================================
+   COMBINED CALENDAR — every brand together, with monthly targets
+   ============================================================ */
+
+function brandLoggedMap(brand){
+
+  const bn = normName(brand.name);
+
+  const logged = {};
+
+  state.entries.forEach(entry=>{
+
+    if(!entry.date || normName(entry.brand) !== bn) return;
+
+    logged[entry.date] = logged[entry.date] || {};
+
+    logged[entry.date][entry.contentType] =
+      (logged[entry.date][entry.contentType] || 0) + 1;
+
+  });
+
+  return logged;
+
+}
+
+/* one brand, one day: target / posted per type (form entries + admin marks) */
+
+function brandDayStatus(brand,iso,logged){
+
+  const targets = dayTargetsFor(brand,iso);
+
+  const manual = dayManualFor(brand,iso);
+
+  const per = {};
+
+  let target = 0, done = 0, posted = 0, met = true;
+
+  POST_TYPES.forEach(type=>{
+
+    const got = ((logged[iso] || {})[type] || 0) + manual[type];
+
+    per[type] = { target:targets[type], got };
+
+    target += targets[type];
+
+    done += Math.min(got,targets[type]);
+
+    posted += got;
+
+    if(targets[type] > 0 && got < targets[type]) met = false;
+
+  });
+
+  return { per, target, done, posted, met };
+
+}
+
+function shiftAllCalMonth(delta){
+
+  const [y,m] = state.calAllMonth.split("-").map(Number);
+
+  const d = new Date(y, m-1+delta, 1);
+
+  state.calAllMonth = d.getFullYear() + "-" + pad2(d.getMonth()+1);
+
+  state.calAllDay = null;
+
+  rerenderKeepScroll();
+
+}
+
+function renderAllBrandsCalendar(){
+
+  const box = el("div");
+
+  box.appendChild(el("div",{
+    class:"section-title",
+    text:"All brands \u2014 combined calendar"
+  }));
+
+  const sec = el("div",{ class:"search-section", id:"all-brands-calendar" });
+
+  if(!state.brands.length){
+
+    sec.appendChild(el("div",{
+      class:"empty",
+      text:"Add a brand above and its targets will show up here."
+    }));
+
+    box.appendChild(sec);
+
+    return box;
+
+  }
+
+  if(!state.calAllMonth){
+
+    const now = new Date();
+
+    state.calAllMonth = now.getFullYear() + "-" + pad2(now.getMonth()+1);
+
+  }
+
+  const [Y,M] = state.calAllMonth.split("-").map(Number);
+
+  const first = new Date(Y,M-1,1);
+
+  const monthLabel =
+    first.toLocaleDateString("en-IN",{ month:"long", year:"numeric" });
+
+  const daysInMonth = new Date(Y,M,0).getDate();
+
+  const todayStr = localISO(new Date());
+
+  const rows = state.brands.map(brand=>({ brand, logged:brandLoggedMap(brand) }));
+
+  /* per-day totals across brands + per-brand month totals */
+
+  const dayInfo = {};
+
+  const brandMonth = rows.map(()=>({ target:0, done:0 }));
+
+  for(let d=1; d<=daysInMonth; d++){
+
+    const iso = Y + "-" + pad2(M) + "-" + pad2(d);
+
+    const info = { target:0, done:0, posted:0, short:0, brands:[] };
+
+    rows.forEach((row,i)=>{
+
+      const st = brandDayStatus(row.brand,iso,row.logged);
+
+      brandMonth[i].target += st.target;
+
+      brandMonth[i].done += st.done;
+
+      if(st.target > 0 || st.posted > 0){
+
+        info.brands.push({ brand:row.brand, st });
+
+      }
+
+      info.target += st.target;
+
+      info.done += st.done;
+
+      info.posted += st.posted;
+
+      if(st.target > 0 && !st.met) info.short++;
+
+    });
+
+    dayInfo[iso] = info;
+
+  }
+
+  const monthTarget = brandMonth.reduce((a,b)=>a + b.target,0);
+
+  const monthDone = brandMonth.reduce((a,b)=>a + b.done,0);
+
+  const pctAll = monthTarget ? Math.round(monthDone / monthTarget * 100) : 0;
+
+  /* header + controls */
+
+  const head = el("div",{
+    style:"display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;"
+  });
+
+  head.appendChild(el("div",{
+    text:state.brands.length + " brand" + (state.brands.length === 1 ? "" : "s") + " \u00b7 " + monthLabel,
+    style:"font-weight:700;font-size:14px;"
+  }));
+
+  const controls = el("div",{ style:"display:flex;flex-wrap:wrap;align-items:center;" });
+
+  controls.appendChild(el("button",{
+    class:"btn-small", text:"\u2039", title:"Previous month",
+    onclick:()=>{ shiftAllCalMonth(-1); }
+  }));
+
+  controls.appendChild(el("span",{
+    text:monthLabel,
+    style:"font-size:13px;font-weight:600;min-width:130px;text-align:center;margin-left:8px;"
+  }));
+
+  controls.appendChild(el("button",{
+    class:"btn-small", text:"\u203a", title:"Next month",
+    onclick:()=>{ shiftAllCalMonth(1); }
+  }));
+
+  controls.appendChild(el("button",{
+    class:"btn-small", text:"Today",
+    onclick:()=>{
+      const n = new Date();
+      state.calAllMonth = n.getFullYear() + "-" + pad2(n.getMonth()+1);
+      state.calAllDay = null;
+      rerenderKeepScroll();
+    }
+  }));
+
+  controls.appendChild(el("button",{
+    class:"btn-small", text:"Refresh",
+    onclick:()=>{ refreshFromCloud(); }
+  }));
+
+  head.appendChild(controls);
+
+  sec.appendChild(head);
+
+  /* headline numbers */
+
+  const stats = el("div",{ class:"member-stats", style:"margin-bottom:14px;" });
+
+  [
+    ["Monthly target (all brands)", String(monthTarget)],
+    ["Posted so far", String(monthDone)],
+    ["Remaining", String(Math.max(0,monthTarget - monthDone))],
+    ["Overall progress", pctAll + "%"]
+  ].forEach(([label,value])=>{
+
+    const stat = el("div",{ class:"member-stat" });
+
+    stat.appendChild(el("div",{ class:"label", text:label }));
+
+    stat.appendChild(el("div",{ class:"value", text:value }));
+
+    stats.appendChild(stat);
+
+  });
+
+  sec.appendChild(stats);
+
+  /* monthly target per brand */
+
+  const scroller1 = el("div",{ style:"overflow-x:auto;margin-bottom:20px;" });
+
+  const table = el("table",{ class:"data-table" });
+
+  const thead = el("thead");
+
+  const headRow = el("tr");
+
+  ["Brand","Daily default","Monthly target","Posted","Remaining","Progress"].forEach(h=>{
+    headRow.appendChild(el("th",{ text:h }));
+  });
+
+  thead.appendChild(headRow);
+
+  table.appendChild(thead);
+
+  const tbody = el("tbody");
+
+  rows.forEach((row,i)=>{
+
+    const mt = brandMonth[i];
+
+    const pct = mt.target ? Math.round(mt.done / mt.target * 100) : 0;
+
+    const tr = el("tr");
+
+    tr.appendChild(el("td",{ text:row.brand.name, style:"font-weight:600;" }));
+
+    tr.appendChild(el("td",{ text:brandDailyText(row.brand), style:"white-space:normal;" }));
+
+    tr.appendChild(el("td",{ text:String(mt.target), style:"font-weight:700;" }));
+
+    tr.appendChild(el("td",{ text:String(mt.done) }));
+
+    tr.appendChild(el("td",{ text:String(Math.max(0,mt.target - mt.done)) }));
+
+    const prog = el("td",{ style:"min-width:150px;" });
+
+    const wrapBar = el("div",{ style:"display:flex;align-items:center;gap:8px;" });
+
+    const track = el("div",{ class:"bar-track" });
+
+    const fill = el("div",{ class:"bar-fill" });
+
+    fill.style.width = Math.min(100,pct) + "%";
+
+    track.appendChild(fill);
+
+    wrapBar.appendChild(track);
+
+    wrapBar.appendChild(el("span",{ text:pct + "%", style:"font-size:12px;min-width:36px;text-align:right;" }));
+
+    prog.appendChild(wrapBar);
+
+    tr.appendChild(prog);
+
+    tbody.appendChild(tr);
+
+  });
+
+  /* totals row */
+
+  const totalRow = el("tr",{ style:"font-weight:700;" });
+
+  totalRow.appendChild(el("td",{ text:"All brands" }));
+
+  totalRow.appendChild(el("td",{ text:"" }));
+
+  totalRow.appendChild(el("td",{ text:String(monthTarget) }));
+
+  totalRow.appendChild(el("td",{ text:String(monthDone) }));
+
+  totalRow.appendChild(el("td",{ text:String(Math.max(0,monthTarget - monthDone)) }));
+
+  totalRow.appendChild(el("td",{ text:pctAll + "%" }));
+
+  tbody.appendChild(totalRow);
+
+  table.appendChild(tbody);
+
+  scroller1.appendChild(table);
+
+  sec.appendChild(scroller1);
+
+  /* legend */
+
+  const legend = el("div",{
+    style:"display:flex;flex-wrap:wrap;gap:14px;font-size:11.5px;color:var(--ink-dim);margin-bottom:10px;"
+  });
+
+  [
+    ["rgba(30,142,90,0.16)","Every brand's target met"],
+    ["rgba(184,134,11,0.18)","In progress"],
+    ["rgba(230,57,70,0.13)","Past day, something missed"],
+    ["var(--panel-alt)","Upcoming / day off"]
+  ].forEach(([color,label])=>{
+
+    const item = el("span",{ style:"display:inline-flex;align-items:center;gap:6px;" });
+
+    item.appendChild(el("span",{
+      style:"width:12px;height:12px;border-radius:3px;border:1px solid var(--rule);background:" + color + ";"
+    }));
+
+    item.appendChild(document.createTextNode(label));
+
+    legend.appendChild(item);
+
+  });
+
+  legend.appendChild(el("span",{ text:"Each day shows posted / target across all brands" }));
+
+  sec.appendChild(legend);
+
+  /* grid */
+
+  const scroller2 = el("div",{ style:"overflow-x:auto;" });
+
+  const grid = el("div",{
+    style:"display:grid;grid-template-columns:repeat(7,minmax(78px,1fr));gap:6px;min-width:560px;"
+  });
+
+  DAY_NAMES.forEach(name=>{
+
+    grid.appendChild(el("div",{
+      text:name,
+      style:"font-size:11px;font-weight:700;letter-spacing:0.06em;color:var(--ink-dim);text-align:center;padding:4px 0;"
+    }));
+
+  });
+
+  const blanks = (first.getDay() + 6) % 7;
+
+  for(let i=0; i<blanks; i++){ grid.appendChild(el("div")); }
+
+  for(let d=1; d<=daysInMonth; d++){
+
+    const iso = Y + "-" + pad2(M) + "-" + pad2(d);
+
+    const info = dayInfo[iso];
+
+    const isPast = iso < todayStr;
+
+    const isToday = iso === todayStr;
+
+    let bg = "var(--panel-alt)";
+
+    let mark = "";
+
+    if(info.target > 0){
+
+      if(info.short === 0){ bg = "rgba(30,142,90,0.16)"; mark = "\u2713"; }
+      else if(isPast){ bg = "rgba(230,57,70,0.13)"; mark = "!"; }
+      else if(info.done > 0){ bg = "rgba(184,134,11,0.18)"; mark = "\u2026"; }
+
+    }
+
+    const selected = state.calAllDay === iso;
+
+    const cell = el("div",{
+      title:"Click to see every brand's target for this day",
+      style:
+        "min-height:84px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:11.5px;background:" + bg + ";" +
+        "border:" + (selected ? "2px solid var(--accent)" : (isToday ? "1px solid var(--accent)" : "1px solid var(--rule)")) + ";",
+      onclick:()=>{
+        state.calAllDay = state.calAllDay === iso ? null : iso;
+        rerenderKeepScroll();
+      }
+    });
+
+    const top = el("div",{ style:"display:flex;justify-content:space-between;margin-bottom:4px;" });
+
+    top.appendChild(el("span",{ text:String(d), style:"font-weight:700;font-size:12.5px;" }));
+
+    top.appendChild(el("span",{ text:mark, style:"font-weight:700;" }));
+
+    cell.appendChild(top);
+
+    if(info.target === 0 && info.posted === 0){
+
+      cell.appendChild(el("div",{ text:"Off", style:"color:var(--ink-dim);" }));
+
+    }else{
+
+      cell.appendChild(el("div",{
+        text:info.done + "/" + info.target,
+        style:"font-size:15px;font-weight:700;line-height:1.3;"
+      }));
+
+      cell.appendChild(el("div",{
+        text:
+          info.target === 0
+            ? "extra posts"
+            : (info.short === 0 ? "all met" : info.short + " brand" + (info.short === 1 ? "" : "s") + " short"),
+        style:"color:var(--ink-dim);"
+      }));
+
+    }
+
+    grid.appendChild(cell);
+
+  }
+
+  scroller2.appendChild(grid);
+
+  sec.appendChild(scroller2);
+
+  /* selected day: every brand */
+
+  if(state.calAllDay){
+
+    const iso = state.calAllDay;
+
+    const info = dayInfo[iso];
+
+    if(info){
+
+      const [dy,dm,dd] = iso.split("-").map(Number);
+
+      const pretty =
+        new Date(dy,dm-1,dd).toLocaleDateString("en-IN",{
+          weekday:"long", day:"numeric", month:"long", year:"numeric"
+        });
+
+      const detail = el("div",{
+        style:"margin-top:16px;padding:14px 16px;border:1px solid var(--rule);border-radius:6px;background:var(--panel-alt);"
+      });
+
+      detail.appendChild(el("div",{
+        text:pretty + " \u2014 " + info.done + " of " + info.target + " posts",
+        style:"font-weight:700;font-size:14px;margin-bottom:8px;"
+      }));
+
+      if(!info.brands.length){
+
+        detail.appendChild(el("div",{
+          text:"No brand has a target or any post on this day.",
+          style:"font-size:12.5px;color:var(--ink-dim);"
+        }));
+
+      }
+
+      info.brands.forEach(({brand,st})=>{
+
+        const parts =
+          POST_TYPES
+            .filter(t=>st.per[t].target > 0 || st.per[t].got > 0)
+            .map(t=>t + " " + st.per[t].got + "/" + st.per[t].target);
+
+        const line = el("div",{
+          style:"display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--rule);font-size:12.5px;"
+        });
+
+        line.appendChild(el("span",{ text:brand.name, style:"font-weight:600;" }));
+
+        line.appendChild(el("span",{
+          text:parts.join(" \u00b7 ") + "  " + (st.target > 0 ? (st.met ? "\u2713" : (iso < todayStr ? "!" : "\u2026")) : "")
+        }));
+
+        detail.appendChild(line);
+
+      });
+
+      detail.appendChild(el("div",{
+        text:"To change this day for one brand, open that brand's own calendar above.",
+        style:"font-size:11.5px;color:var(--ink-dim);margin-top:8px;"
+      }));
+
+      sec.appendChild(detail);
+
+    }
+
+  }
+
+  box.appendChild(sec);
+
+  return box;
+
+}
+
+
+/* ============================================================
    PEOPLE — DELETE A PERSON (admin)
    ============================================================ */
 
@@ -5757,6 +6387,10 @@ function renderAdmin(){
   /* BRANDS + CONTENT CALENDAR */
 
   wrap.appendChild(renderBrandsAdmin());
+
+  /* COMBINED CALENDAR OF ALL BRANDS */
+
+  wrap.appendChild(renderAllBrandsCalendar());
 
   /* PEOPLE (delete) */
 
@@ -6159,7 +6793,7 @@ function renderAdmin(){
   wrap.appendChild(searchSection);
 
 
-  /* SHOOTS PER MEMBER */
+  /* SHOOTS PER MEMBER  (filter by name and brand) */
 
   wrap.appendChild(
 
@@ -6171,51 +6805,61 @@ function renderAdmin(){
   );
 
 
+  const everyName =
+    Array.from(
+      new Set([
+        ...state.members,
+        ...state.entries.map(entry=>entry.member || "Unknown")
+      ])
+    );
+
+  if(state.chartName && !everyName.includes(state.chartName)){
+    state.chartName = "";
+  }
+
+  const chartEntries =
+    state.entries.filter(entry=>
+      !state.chartBrand ||
+      normName(entry.brand) === normName(state.chartBrand)
+    );
+
   const counts = {};
 
+  chartEntries.forEach(entry=>{
 
-  state.entries.forEach(entry=>{
+    const name = entry.member || "Unknown";
 
-    const name =
-      entry.member || "Unknown";
-
-
-    counts[name] =
-      (counts[name] || 0) + 1;
+    counts[name] = (counts[name] || 0) + 1;
 
   });
 
+  let allNames = everyName.slice();
 
-  const countValues =
-    Object.values(counts);
+  if(state.chartName){
 
+    allNames = [state.chartName];
+
+  }else if(state.chartBrand){
+
+    /* a brand is picked: only show people who worked on it */
+
+    allNames = allNames.filter(name=>(counts[name] || 0) > 0);
+
+  }
 
   const maxCount =
-    Math.max(
-      1,
-      ...countValues
-    );
+    Math.max(1, ...allNames.map(name=>counts[name] || 0));
 
+  wrap.appendChild(
+    renderTeamChartFilters(
+      everyName,
+      allNames.reduce((sum,name)=>sum + (counts[name] || 0),0)
+    )
+  );
 
-  const barsWrap =
-    el("div",{});
+  const barsWrap = el("div",{});
 
-
-  const allNames =
-    Array.from(
-
-      new Set([
-
-        ...state.members,
-
-        ...Object.keys(counts)
-
-      ])
-
-    );
-
-
-  if(!allNames.length){
+  if(!everyName.length){
 
     barsWrap.appendChild(
 
@@ -6226,62 +6870,38 @@ function renderAdmin(){
 
     );
 
+  }else if(!allNames.length){
+
+    barsWrap.appendChild(
+
+      el("div",{
+        class:"empty",
+        text:"No shoots match these filters."
+      })
+
+    );
+
   }else{
 
     allNames.forEach(name=>{
 
-      const count =
-        counts[name] || 0;
+      const count = counts[name] || 0;
 
+      const row = el("div",{ class:"bar-row" });
 
-      const row =
-        el("div",{
-          class:"bar-row"
-        });
+      row.appendChild(el("div",{ class:"name", text:name }));
 
+      const track = el("div",{ class:"bar-track" });
 
-      row.appendChild(
+      const fill = el("div",{ class:"bar-fill" });
 
-        el("div",{
-          class:"name",
-          text:name
-        })
-
-      );
-
-
-      const track =
-        el("div",{
-          class:"bar-track"
-        });
-
-
-      const fill =
-        el("div",{
-          class:"bar-fill"
-        });
-
-
-      fill.style.width =
-        Math.round(
-          (count / maxCount) * 100
-        ) + "%";
-
+      fill.style.width = Math.round((count / maxCount) * 100) + "%";
 
       track.appendChild(fill);
 
       row.appendChild(track);
 
-
-      row.appendChild(
-
-        el("div",{
-          class:"cnt",
-          text:String(count)
-        })
-
-      );
-
+      row.appendChild(el("div",{ class:"cnt", text:String(count) }));
 
       /* Quick per-member export button on each bar row */
 
@@ -6293,28 +6913,19 @@ function renderAdmin(){
 
           text:"Download",
 
-          title:
-            "Download " +
-            name +
-            "'s shoots as Excel",
+          title:"Download " + name + "'s shoots as Excel",
 
-          onclick:()=>{
-
-            exportMemberToExcel(name);
-
-          }
+          onclick:()=>{ exportMemberToExcel(name); }
 
         })
 
       );
-
 
       barsWrap.appendChild(row);
 
     });
 
   }
-
 
   wrap.appendChild(barsWrap);
 
